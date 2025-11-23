@@ -1,4 +1,9 @@
-﻿using CircuitDiagram.Circuit;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.IO;
+using System.Threading.Tasks;
+using CircuitDiagram.Circuit;
 using CircuitDiagram.Render;
 using CircuitDiagram.Render.Skia;
 using SkiaSharp;
@@ -13,6 +18,9 @@ using CDPoint = CircuitDiagram.Primitives.Point;
 using CircuitDiagram.TypeDescriptionIO.Xml.Logging;
 using Microsoft.Extensions.Logging;
 using CircuitDiagram.UI.Services;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Storage;
+using Microsoft.Maui.Devices;
 
 namespace CircuitDiagram.UI;
 
@@ -189,6 +197,9 @@ public partial class MainPage : ContentPage
         var canvas = e.Surface.Canvas;
         canvas.Clear(SKColors.White);
 
+        // Draw Grid
+        DrawGrid(canvas, e.Info.Width, e.Info.Height);
+
         if (_circuit != null && _renderer != null)
         {
             using (var context = new MauiDrawingContext(canvas))
@@ -204,6 +215,30 @@ public partial class MainPage : ContentPage
                     canvas.DrawText($"Error rendering: {ex.Message}", 10, 30, new SKFont(), paint);
                 }
             }
+        }
+    }
+
+    private void DrawGrid(SKCanvas canvas, int width, int height)
+    {
+        var paint = new SKPaint
+        {
+            Color = new SKColor(240, 240, 240), // Light gray
+            StrokeWidth = 1,
+            IsAntialias = false
+        };
+
+        int gridSize = 20; // Match snap grid size
+
+        // Vertical lines
+        for (int x = 0; x < width; x += gridSize)
+        {
+            canvas.DrawLine(x, 0, x, height, paint);
+        }
+
+        // Horizontal lines
+        for (int y = 0; y < height; y += gridSize)
+        {
+            canvas.DrawLine(0, y, width, y, paint);
         }
     }
 
@@ -238,12 +273,12 @@ public partial class MainPage : ContentPage
                     var dx = e.Location.X - _dragStartTouch.X;
                     var dy = e.Location.Y - _dragStartTouch.Y;
                     
-                    // Snap to grid (10 units)
+                    // Snap to grid (20 units)
                     var newX = _dragStartLocation.X + dx;
                     var newY = _dragStartLocation.Y + dy;
                     
-                    newX = Math.Round(newX / 10.0) * 10.0;
-                    newY = Math.Round(newY / 10.0) * 10.0;
+                    newX = Math.Round(newX / 20.0) * 20.0;
+                    newY = Math.Round(newY / 20.0) * 20.0;
 
                     _draggingComponent.Layout.Location = new CDPoint(newX, newY);
                     canvasView.InvalidateSurface();
