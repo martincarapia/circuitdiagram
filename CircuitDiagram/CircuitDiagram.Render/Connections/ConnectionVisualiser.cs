@@ -25,12 +25,30 @@ using CircuitDiagram.Circuit;
 using CircuitDiagram.CircuitExtensions;
 using CircuitDiagram.Drawing;
 using CircuitDiagram.Primitives;
+using CircuitDiagram.TypeDescription;
+using CircuitDiagram.TypeDescription.Conditions;
+using CircuitDiagram.Components.Description;
 
 namespace CircuitDiagram.Render.Connections
 {
     public class ConnectionVisualiser : IConnectionVisualiser
     {
         private static readonly ComponentType WireType = new TypeDescriptionComponentType(Guid.Parse("6353882b-5208-4f88-a83b-2271cc82b94f"), new Uri("uri:internal"), "wire");
+
+        private static readonly ComponentDescription WireDescription = new ComponentDescription
+        {
+            Connections = new[]
+            {
+                new ConnectionGroup(ConditionTree.Empty, new[]
+                {
+                    new ConnectionDescription(
+                        new ComponentPoint(ComponentPosition.Start, ComponentPosition.Start, new Vector(0, 0)),
+                        new ComponentPoint(ComponentPosition.End, ComponentPosition.End, new Vector(0, 0)),
+                        ConnectionEdge.Both,
+                        new ConnectionName("wire"))
+                })
+            }
+        };
 
         private readonly IComponentDescriptionLookup descriptionLookup;
         private readonly IConnectionPositioner connectionPositioner;
@@ -87,7 +105,15 @@ namespace CircuitDiagram.Render.Connections
 
         private IList<ConnectionPoint> GetConnectionPoints(PositionalComponent component, LayoutOptions layoutOptions)
         {
-            var description = descriptionLookup.GetDescription(component.Type);
+            ComponentDescription description;
+            if (component.Type == WireType)
+            {
+                description = WireDescription;
+            }
+            else
+            {
+                description = descriptionLookup.GetDescription(component.Type);
+            }
 
             if (description == null)
             {
