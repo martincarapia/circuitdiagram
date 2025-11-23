@@ -2,6 +2,12 @@
 
 This is a .NET MAUI based GUI for Circuit Diagram.
 
+## Prerequisites
+
+- .NET 9.0 SDK
+- .NET MAUI workload (`dotnet workload install maui`)
+- (macOS) Xcode (for MacCatalyst/iOS targets)
+
 ## Features
 
 - Render circuit diagrams using SkiaSharp.

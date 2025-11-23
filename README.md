@@ -25,6 +25,18 @@ For creating your own custom components, see
 
 Open *CircuitDiagram/CircuitDiagram.sln* in Visual Studio. The dependencies should download automatically.
 
+## Development UI
+
+A .NET MAUI-based graphical interface is available in the `CircuitDiagram.UI` project. This tool allows for testing custom components and visualizing circuit diagrams during development.
+
+To run the UI:
+
+1. Ensure you have the .NET MAUI workload installed (`dotnet workload install maui`).
+2. Navigate to the `CircuitDiagram/CircuitDiagram.UI` directory.
+3. Run the project using `dotnet run -f net9.0-maccatalyst` (or your preferred platform).
+
+For more details, see the [CircuitDiagram.UI README](CircuitDiagram/CircuitDiagram.UI/README.md).
+
 ## Issues
 
 Please submit all issues, bugs and feature requests using the [GitHub issues tracker](https://github.com/circuitdiagram/circuitdiagram/issues).
