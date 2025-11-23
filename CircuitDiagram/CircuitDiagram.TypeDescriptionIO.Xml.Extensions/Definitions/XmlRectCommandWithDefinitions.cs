@@ -11,29 +11,35 @@ namespace CircuitDiagram.TypeDescriptionIO.Xml.Extensions.Definitions
     {
         public new ConditionalCollection<double> Width { get; set; }
 
+        public new ConditionalCollection<double> Height { get; set; }
+
         public override IEnumerable<Conditional<IRenderCommand>> Flatten(FlattenContext context)
         {
             foreach (var location in Location.Flatten(context))
             {
                 foreach (var width in Width)
                 {
-                    var conditions = ConditionTreeBuilder.And(new[]
+                    foreach (var height in Height)
                     {
-                        location.Conditions,
-                        width.Conditions,
-                    });
+                        var conditions = ConditionTreeBuilder.And(new[]
+                        {
+                            location.Conditions,
+                            width.Conditions,
+                            height.Conditions,
+                        });
 
-                    double flatWidth = context.AutoRotate.Mirror ? Height : width.Value;
-                    double flatHeight = context.AutoRotate.Mirror ? width.Value: Height;
+                        double flatWidth = context.AutoRotate.Mirror ? height.Value : width.Value;
+                        double flatHeight = context.AutoRotate.Mirror ? width.Value : height.Value;
 
-                    var command = new Rectangle(
-                        location.Value,
-                        flatWidth,
-                        flatHeight,
-                        StrokeThickness,
-                        Fill);
+                        var command = new Rectangle(
+                            location.Value,
+                            flatWidth,
+                            flatHeight,
+                            StrokeThickness,
+                            Fill);
 
-                    yield return new Conditional<IRenderCommand>(command, conditions);
+                        yield return new Conditional<IRenderCommand>(command, conditions);
+                    }
                 }
             }
         }

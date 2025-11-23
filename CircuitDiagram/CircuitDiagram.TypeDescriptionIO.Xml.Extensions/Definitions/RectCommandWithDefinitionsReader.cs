@@ -62,8 +62,13 @@ namespace CircuitDiagram.TypeDescriptionIO.Xml.Extensions.Definitions
                 return false;
             }
 
+            if (!TryReadDouble(element.Attribute("height"), out var height))
+            {
+                return false;
+            }
+
             rectCommand.Width = width;
-            rectCommand.Height = double.Parse(element.Attribute("height").Value);
+            rectCommand.Height = height;
 
             return true;
         }

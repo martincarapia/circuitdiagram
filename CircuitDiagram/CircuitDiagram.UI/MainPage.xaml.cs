@@ -55,8 +55,8 @@ public partial class MainPage : ContentPage
                     { DevicePlatform.iOS, new[] { "public.xml" } },
                     { DevicePlatform.Android, new[] { "application/xml" } },
                     { DevicePlatform.WinUI, new[] { ".xml" } },
-                    { DevicePlatform.macOS, new[] { "xml" } },
-                    { DevicePlatform.MacCatalyst, new[] { "xml" } }
+                    { DevicePlatform.macOS, new[] { "public.xml" } },
+                    { DevicePlatform.MacCatalyst, new[] { "public.xml" } }
                 })
             });
 
