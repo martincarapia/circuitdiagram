@@ -267,6 +267,22 @@ public partial class MainPage : ContentPage
         var dist = Math.Sqrt(Math.Pow(component.Layout.Location.X - point.X, 2) + Math.Pow(component.Layout.Location.Y - point.Y, 2));
         return dist < 40; // 40 units radius
     }
+
+    private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
+    {
+        var searchText = e.NewTextValue;
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            componentsList.ItemsSource = _componentService.Components;
+        }
+        else
+        {
+            componentsList.ItemsSource = _componentService.Components
+                .Where(c => c.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) || 
+                            c.Category.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
 }
 
 public class StringListLogger : IXmlLoadLogger

@@ -1,4 +1,9 @@
+using CircuitDiagram.Circuit;
+using CircuitDiagram.Primitives;
+using CircuitDiagram.Render;
 using CircuitDiagram.TypeDescription;
+using SkiaSharp;
+using CDPoint = CircuitDiagram.Primitives.Point;
 using CircuitDiagram.TypeDescriptionIO.Xml;
 using CircuitDiagram.TypeDescriptionIO.Xml.Extensions.Definitions;
 using CircuitDiagram.TypeDescriptionIO.Xml.Logging;
@@ -60,6 +65,16 @@ public class ComponentService
                             Category = category
                         };
 
+                        // Generate Preview
+                        try 
+                        {
+                            item.Preview = GeneratePreview(description);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error generating preview for {description.ComponentName}: {ex.Message}");
+                        }
+
                         // Marshal back to UI thread if needed, but ObservableCollection usually needs UI thread
                         MainThread.BeginInvokeOnMainThread(() => 
                         {
@@ -77,6 +92,41 @@ public class ComponentService
                 }
             }
         });
+    }
+
+    private ImageSource GeneratePreview(ComponentDescription description)
+    {
+        int width = 60;
+        int height = 60;
+        
+        using var surface = SKSurface.Create(new SKImageInfo(width, height));
+        var canvas = surface.Canvas;
+        // Use transparent background, but maybe white is better for visibility if lines are black
+        // canvas.Clear(SKColors.Transparent); 
+        
+        // Create a lookup for the renderer
+        var lookup = new DictionaryComponentDescriptionLookup();
+        var type = new TypeDescriptionComponentType(description.Metadata.GUID, new Uri("http://circuit-diagram.org/components"), description.ComponentName);
+        lookup.AddDescription(type, description);
+        
+        var renderer = new CircuitRenderer(lookup);
+        
+        var component = new PositionalComponent(type);
+        // Center the component roughly. 
+        // Most components are drawn relative to (0,0) or centered.
+        // Let's put it at center.
+        component.Layout.Location = new CDPoint(width / 2, height / 2);
+        
+        using (var context = new MauiDrawingContext(canvas))
+        {
+            context.Color = SKColors.Black;
+            renderer.RenderComponent(component, context, ignoreOffset: false);
+        }
+        
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        var bytes = data.ToArray();
+        return ImageSource.FromStream(() => new MemoryStream(bytes));
     }
 
     private class ServiceLogger : IXmlLoadLogger
@@ -98,4 +148,5 @@ public class ComponentItem
     public ComponentDescription Description { get; set; } = new();
     public string Category { get; set; } = string.Empty;
     public string Name => Description?.ComponentName ?? "Unknown";
+    public ImageSource? Preview { get; set; }
 }
