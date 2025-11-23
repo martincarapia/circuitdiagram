@@ -206,6 +206,67 @@ public partial class MainPage : ContentPage
             }
         }
     }
+
+    private PositionalComponent? _draggingComponent;
+    private CDPoint _dragStartLocation;
+    private SKPoint _dragStartTouch;
+
+    private void OnTouch(object sender, SKTouchEventArgs e)
+    {
+        var touchPoint = new CDPoint(e.Location.X, e.Location.Y);
+
+        switch (e.ActionType)
+        {
+            case SKTouchAction.Pressed:
+                // Hit test
+                // Simple hit test: find component closest to touch point within a threshold
+                _draggingComponent = _circuit.Elements
+                    .OfType<PositionalComponent>()
+                    .FirstOrDefault(c => IsHit(c, touchPoint));
+                
+                if (_draggingComponent != null)
+                {
+                    _dragStartLocation = _draggingComponent.Layout.Location;
+                    _dragStartTouch = e.Location;
+                    e.Handled = true;
+                }
+                break;
+
+            case SKTouchAction.Moved:
+                if (_draggingComponent != null)
+                {
+                    var dx = e.Location.X - _dragStartTouch.X;
+                    var dy = e.Location.Y - _dragStartTouch.Y;
+                    
+                    // Snap to grid (10 units)
+                    var newX = _dragStartLocation.X + dx;
+                    var newY = _dragStartLocation.Y + dy;
+                    
+                    newX = Math.Round(newX / 10.0) * 10.0;
+                    newY = Math.Round(newY / 10.0) * 10.0;
+
+                    _draggingComponent.Layout.Location = new CDPoint(newX, newY);
+                    canvasView.InvalidateSurface();
+                    e.Handled = true;
+                }
+                break;
+
+            case SKTouchAction.Released:
+            case SKTouchAction.Cancelled:
+                _draggingComponent = null;
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private bool IsHit(PositionalComponent component, CDPoint point)
+    {
+        // Simple distance check for now
+        // Most components are drawn around their location or to the right/down
+        // Let's assume a hit box around the location
+        var dist = Math.Sqrt(Math.Pow(component.Layout.Location.X - point.X, 2) + Math.Pow(component.Layout.Location.Y - point.Y, 2));
+        return dist < 40; // 40 units radius
+    }
 }
 
 public class StringListLogger : IXmlLoadLogger

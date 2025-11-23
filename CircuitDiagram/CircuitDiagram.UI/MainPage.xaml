@@ -21,7 +21,7 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <skia:SKCanvasView x:Name="canvasView" Grid.Row="1" Grid.Column="1" PaintSurface="OnPaintSurface" />
+        <skia:SKCanvasView x:Name="canvasView" Grid.Row="1" Grid.Column="1" PaintSurface="OnPaintSurface" EnableTouchEvents="True" Touch="OnTouch" />
     </Grid>
 
 </ContentPage>
