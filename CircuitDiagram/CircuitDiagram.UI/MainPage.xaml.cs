@@ -31,14 +31,6 @@ public partial class MainPage : ContentPage
     {
         // Create a simple circuit
         _circuit = new CircuitDocument();
-        
-        // Add a wire
-        var wire = new Wire(new LayoutInformation { Location = new CDPoint(100, 100), Size = 200, Orientation = Orientation.Horizontal });
-        _circuit.Elements.Add(wire);
-
-        // Add another wire
-        var wire2 = new Wire(new LayoutInformation { Location = new CDPoint(300, 100), Size = 200, Orientation = Orientation.Vertical });
-        _circuit.Elements.Add(wire2);
 
         // Setup renderer with empty lookup for now
         _lookup = new DictionaryComponentDescriptionLookup();
