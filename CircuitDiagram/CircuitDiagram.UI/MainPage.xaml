@@ -4,12 +4,24 @@
              xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="CircuitDiagram.UI.MainPage">
 
-    <Grid RowDefinitions="Auto,*">
-        <HorizontalStackLayout Spacing="10" Margin="10">
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="250,*">
+        <HorizontalStackLayout Spacing="10" Margin="10" Grid.ColumnSpan="2">
             <Button Text="Load Component" Clicked="OnLoadComponentClicked"/>
             <Button Text="Render Circuit" Clicked="OnRenderClicked"/>
         </HorizontalStackLayout>
-        <skia:SKCanvasView x:Name="canvasView" Grid.Row="1" PaintSurface="OnPaintSurface" />
+        
+        <CollectionView x:Name="componentsList" Grid.Row="1" Grid.Column="0" SelectionMode="Single" SelectionChanged="OnComponentSelected">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <VerticalStackLayout Padding="10">
+                        <Label Text="{Binding Name}" FontAttributes="Bold"/>
+                        <Label Text="{Binding Category}" FontSize="Caption" TextColor="Gray"/>
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <skia:SKCanvasView x:Name="canvasView" Grid.Row="1" Grid.Column="1" PaintSurface="OnPaintSurface" />
     </Grid>
 
 </ContentPage>

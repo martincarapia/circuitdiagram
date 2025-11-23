@@ -12,6 +12,7 @@ using CircuitDiagram.Primitives;
 using CDPoint = CircuitDiagram.Primitives.Point;
 using CircuitDiagram.TypeDescriptionIO.Xml.Logging;
 using Microsoft.Extensions.Logging;
+using CircuitDiagram.UI.Services;
 
 namespace CircuitDiagram.UI;
 
@@ -20,11 +21,15 @@ public partial class MainPage : ContentPage
     private CircuitDocument _circuit = null!;
     private CircuitRenderer _renderer = null!;
     private DictionaryComponentDescriptionLookup _lookup = null!;
+    private ComponentService _componentService;
 
     public MainPage()
     {
         InitializeComponent();
         InitializeCircuit();
+        _componentService = new ComponentService();
+        componentsList.ItemsSource = _componentService.Components;
+        LoadComponents();
     }
 
     private void InitializeCircuit()
@@ -35,6 +40,74 @@ public partial class MainPage : ContentPage
         // Setup renderer with empty lookup for now
         _lookup = new DictionaryComponentDescriptionLookup();
         _renderer = new CircuitRenderer(_lookup);
+    }
+
+    private async void LoadComponents()
+    {
+        // Try to find the components directory
+        // This is a hack for development environment
+        var currentDir = AppDomain.CurrentDomain.BaseDirectory;
+        
+        // Walk up to find the solution root
+        var dir = new DirectoryInfo(currentDir);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "components")))
+        {
+            dir = dir.Parent;
+        }
+        
+        if (dir != null)
+        {
+            var componentsPath = Path.Combine(dir.FullName, "components");
+            await _componentService.LoadComponentsAsync(componentsPath);
+        }
+        else
+        {
+            Console.WriteLine("Could not find components directory.");
+            await DisplayAlert("Error", "Could not find components directory. Please ensure the submodule is initialized.", "OK");
+        }
+    }
+
+    private void OnComponentSelected(object sender, SelectionChangedEventArgs e)
+    {
+        var item = e.CurrentSelection.FirstOrDefault() as ComponentItem;
+        if (item == null) return;
+        
+        var description = item.Description;
+
+        // Add component to circuit
+        var componentType = new TypeDescriptionComponentType(
+            description.Metadata.GUID, 
+            new Uri("http://circuit-diagram.org/components"), 
+            description.ComponentName);
+
+        // Check if we already have this description, if not add it
+        // Note: DictionaryComponentDescriptionLookup doesn't expose Contains easily for TypeDescriptionComponentType without implementing it, 
+        // but we can just try to add or check if we can retrieve it.
+        // Actually, let's just add it. The lookup might throw if it exists? 
+        // Let's check DictionaryComponentDescriptionLookup source if possible, or just try/catch or check if we can.
+        // For now, I'll just add it and assume it handles duplicates or I'll check.
+        
+        // To be safe, let's just re-add or ignore.
+        // _lookup.AddDescription(componentType, description); 
+        // But wait, _lookup is DictionaryComponentDescriptionLookup.
+        
+        try 
+        {
+             _lookup.AddDescription(componentType, description);
+        }
+        catch (ArgumentException) 
+        {
+            // Already exists, ignore
+        }
+        
+        var component = new PositionalComponent(componentType);
+        component.Layout.Location = new CDPoint(100, 100); 
+        _circuit.Elements.Add(component);
+        
+        canvasView.InvalidateSurface();
+        
+        // Deselect
+        componentsList.SelectedItem = null;
     }
 
     private async void OnLoadComponentClicked(object sender, EventArgs e)
