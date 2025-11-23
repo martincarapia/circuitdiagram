@@ -10,6 +10,8 @@ using CircuitDiagram.TypeDescriptionIO.Xml.Extensions.Definitions;
 using CircuitDiagram.TypeDescription;
 using CircuitDiagram.Primitives;
 using CDPoint = CircuitDiagram.Primitives.Point;
+using CircuitDiagram.TypeDescriptionIO.Xml.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace CircuitDiagram.UI;
 
@@ -45,6 +47,7 @@ public partial class MainPage : ContentPage
 
     private async void OnLoadComponentClicked(object sender, EventArgs e)
     {
+        Console.WriteLine("[DEBUG] OnLoadComponentClicked started");
         try
         {
             var result = await FilePicker.Default.PickAsync(new PickOptions
@@ -52,22 +55,29 @@ public partial class MainPage : ContentPage
                 PickerTitle = "Select Component XML",
                 FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    { DevicePlatform.iOS, new[] { "public.xml" } },
+                    { DevicePlatform.iOS, new[] { "public.xml", "public.content" } },
                     { DevicePlatform.Android, new[] { "application/xml" } },
                     { DevicePlatform.WinUI, new[] { ".xml" } },
-                    { DevicePlatform.macOS, new[] { "public.xml" } },
-                    { DevicePlatform.MacCatalyst, new[] { "public.xml" } }
+                    { DevicePlatform.macOS, new[] { "public.xml", "public.content" } },
+                    { DevicePlatform.MacCatalyst, new[] { "public.xml", "public.content" } }
                 })
             });
 
             if (result != null)
             {
+                Console.WriteLine($"[DEBUG] File picked: {result.FullPath}");
                 using var stream = await result.OpenReadAsync();
+                Console.WriteLine("[DEBUG] Stream opened");
+                
                 var loader = new XmlLoader();
                 loader.UseDefinitions();
+                Console.WriteLine("[DEBUG] Loader configured");
                 
-                if (loader.Load(stream, out var description))
+                var logger = new StringListLogger();
+                Console.WriteLine("[DEBUG] Starting Load...");
+                if (loader.Load(stream, logger, out var description))
                 {
+                    Console.WriteLine($"[DEBUG] Load success: {description.ComponentName}");
                     var componentType = new TypeDescriptionComponentType(
                         description.Metadata.GUID, 
                         new Uri("http://circuit-diagram.org/components"), 
@@ -85,12 +95,21 @@ public partial class MainPage : ContentPage
                 }
                 else
                 {
-                    await DisplayAlert("Error", "Failed to load component description.", "OK");
+                    Console.WriteLine("[DEBUG] Load failed");
+                    var errorMsg = string.Join("\n", logger.Errors);
+                    Console.WriteLine($"[DEBUG] Errors: {errorMsg}");
+                    if (string.IsNullOrEmpty(errorMsg)) errorMsg = "Unknown error.";
+                    await DisplayAlert("Error", $"Failed to load component description.\n{errorMsg}", "OK");
                 }
+            }
+            else
+            {
+                Console.WriteLine("[DEBUG] File picking cancelled or result is null");
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DEBUG] Exception: {ex}");
             await DisplayAlert("Error", $"An error occurred: {ex.Message}", "OK");
         }
     }
@@ -120,6 +139,19 @@ public partial class MainPage : ContentPage
                     canvas.DrawText($"Error rendering: {ex.Message}", 10, 30, new SKFont(), paint);
                 }
             }
+        }
+    }
+}
+
+public class StringListLogger : IXmlLoadLogger
+{
+    public List<string> Errors { get; } = new List<string>();
+
+    public void Log(LogLevel level, FileRange position, string message, Exception innerException)
+    {
+        if (level >= LogLevel.Warning)
+        {
+            Errors.Add($"{level}: {message} {innerException?.Message}");
         }
     }
 }
