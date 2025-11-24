@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+
+    - uses: dotnet/nbgv@v0.4
+      id: nbgv
+      with:
+        path: ./CircuitDiagram
+
+    - name: Publish Windows
+      run: |
+        dotnet publish CircuitDiagram/CircuitDiagram.UI/CircuitDiagram.UI.csproj -f net9.0-windows10.0.19041.0 -c Release -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -o ./publish/win-x64
+
+    - name: Zip Windows Artifact
+      run: |
+        Compress-Archive -Path ./publish/win-x64/* -DestinationPath ./CircuitDiagram-Windows.zip
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: CircuitDiagram-Windows
+        path: CircuitDiagram-Windows.zip
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+
+    - uses: dotnet/nbgv@v0.4
+      id: nbgv
+      with:
+        path: ./CircuitDiagram
+
+    - name: Publish MacCatalyst
+      run: |
+        dotnet publish CircuitDiagram/CircuitDiagram.UI/CircuitDiagram.UI.csproj -f net9.0-maccatalyst -c Release -o ./publish/mac
+
+    # Note: The output for MacCatalyst is usually a .app bundle inside the publish folder.
+    # We need to zip the .app bundle.
+    - name: Zip Mac Artifact
+      run: |
+        cd ./publish/mac
+        zip -r ../../CircuitDiagram-Mac.zip CircuitDiagram.app
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: CircuitDiagram-Mac
+        path: CircuitDiagram-Mac.zip
+
+  create-release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: CircuitDiagram-Windows
+    
+    - uses: actions/download-artifact@v3
+      with:
+        name: CircuitDiagram-Mac
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          CircuitDiagram-Windows.zip
+          CircuitDiagram-Mac.zip
+        draft: true
+        prerelease: false
