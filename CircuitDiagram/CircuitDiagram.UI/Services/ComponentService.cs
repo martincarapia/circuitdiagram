@@ -1,6 +1,7 @@
 using CircuitDiagram.Circuit;
 using CircuitDiagram.Primitives;
 using CircuitDiagram.Render;
+using CircuitDiagram.Render.Skia;
 using CircuitDiagram.TypeDescription;
 using SkiaSharp;
 using CDPoint = CircuitDiagram.Primitives.Point;
@@ -117,7 +118,7 @@ public class ComponentService
         // Let's put it at center.
         component.Layout.Location = new CDPoint(width / 2, height / 2);
         
-        using (var context = new MauiDrawingContext(canvas))
+        using (var context = new SkiaDrawingContext(canvas))
         {
             context.Color = SKColors.Black;
             renderer.RenderComponent(component, context, ignoreOffset: false);

@@ -134,26 +134,125 @@ namespace CircuitDiagram.UI
 
         public void DrawText(CDPoint anchor, CDTextAlignment alignment, double rotation, IList<TextRun> textRuns)
         {
-            var font = new SKFont
-            {
-                Size = 12f * _scale,
-                Subpixel = true,
-                LinearMetrics = rotation != 0.0
-            };
+            if (textRuns == null || textRuns.Count == 0) return;
 
             var paint = new SKPaint
             {
                 Color = Color,
                 IsAntialias = true,
                 Style = SKPaintStyle.Fill,
+                SubpixelText = true
             };
 
-            var startLocation = anchor.ToSkPoint(_scale);
-            
-            foreach (TextRun run in textRuns)
+            // 1. Measure total width and height
+            float totalWidth = 0;
+            float maxHeight = 0;
+            float maxAscent = 0;
+            float maxDescent = 0;
+
+            var measuredRuns = new List<(TextRun Run, float Width, float Height, float Ascent, float Descent, SKFont Font)>();
+
+            foreach (var run in textRuns)
             {
-                 _canvas.DrawText(run.Text, startLocation, font, paint);
+                var fontSize = (float)run.Formatting.Size * _scale;
+                if (run.Formatting.FormattingType != TextRunFormattingType.Normal)
+                {
+                    fontSize *= 0.7f; // Smaller for sub/super
+                }
+
+                var font = new SKFont
+                {
+                    Size = fontSize,
+                    Subpixel = true,
+                    LinearMetrics = true
+                };
+
+                var width = font.MeasureText(run.Text, paint);
+                font.GetFontMetrics(out var metrics);
+                
+                var ascent = -metrics.Ascent;
+                var descent = metrics.Descent;
+                var height = ascent + descent;
+
+                measuredRuns.Add((run, width, height, ascent, descent, font));
+
+                totalWidth += width;
+                maxHeight = Math.Max(maxHeight, height);
+                maxAscent = Math.Max(maxAscent, ascent);
+                maxDescent = Math.Max(maxDescent, descent);
             }
+
+            // 2. Calculate offsets based on alignment
+            float xOffset = 0;
+            float yOffset = 0;
+
+            // Horizontal alignment
+            switch (alignment)
+            {
+                case CDTextAlignment.TopCentre:
+                case CDTextAlignment.CentreCentre:
+                case CDTextAlignment.BottomCentre:
+                    xOffset = -totalWidth / 2;
+                    break;
+                case CDTextAlignment.TopRight:
+                case CDTextAlignment.CentreRight:
+                case CDTextAlignment.BottomRight:
+                    xOffset = -totalWidth;
+                    break;
+            }
+
+            // Vertical alignment
+            switch (alignment)
+            {
+                case CDTextAlignment.TopLeft:
+                case CDTextAlignment.TopCentre:
+                case CDTextAlignment.TopRight:
+                    yOffset = maxAscent; 
+                    break;
+                case CDTextAlignment.CentreLeft:
+                case CDTextAlignment.CentreCentre:
+                case CDTextAlignment.CentreRight:
+                    yOffset = maxAscent - (maxAscent + maxDescent) / 2;
+                    break;
+                case CDTextAlignment.BottomLeft:
+                case CDTextAlignment.BottomCentre:
+                case CDTextAlignment.BottomRight:
+                    yOffset = -maxDescent;
+                    break;
+            }
+
+            // 3. Draw
+            _canvas.Save();
+            var anchorSk = anchor.ToSkPoint(_scale);
+            _canvas.Translate(anchorSk.X, anchorSk.Y);
+            if (rotation != 0)
+            {
+                _canvas.RotateDegrees((float)rotation);
+            }
+
+            float currentX = xOffset;
+            
+            foreach (var item in measuredRuns)
+            {
+                var run = item.Run;
+                var font = item.Font;
+                
+                float yPos = yOffset;
+                
+                if (run.Formatting.FormattingType == TextRunFormattingType.Subscript)
+                {
+                    yPos += item.Ascent * 0.3f; 
+                }
+                else if (run.Formatting.FormattingType == TextRunFormattingType.Superscript)
+                {
+                    yPos -= item.Ascent * 0.4f;
+                }
+
+                _canvas.DrawText(run.Text, currentX, yPos, font, paint);
+                currentX += item.Width;
+            }
+
+            _canvas.Restore();
         }
 
         public void Dispose()

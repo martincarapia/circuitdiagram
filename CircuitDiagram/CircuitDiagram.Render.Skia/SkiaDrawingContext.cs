@@ -33,6 +33,7 @@ namespace CircuitDiagram.Render.Skia
     {
         private readonly SKTypeface typeface;
         private readonly SKSurface surface;
+        private readonly SKCanvas canvas;
         private readonly float fontSizeScale;
 
         public SkiaDrawingContext(int width, int height, SKColor background, float scale = 1.0f)
@@ -47,13 +48,29 @@ namespace CircuitDiagram.Render.Skia
             surface = SKSurface.Create(new SKImageInfo((int)(width * scale), (int)(height * scale), SKImageInfo.PlatformColorType, SKAlphaType.Opaque));
             surface.Canvas.Clear(background);
             surface.Canvas.Scale(scale);
+            canvas = surface.Canvas;
+        }
+
+        public SkiaDrawingContext(SKCanvas canvas, float scale = 1.0f)
+        {
+            this.canvas = canvas;
+            this.fontSizeScale = 1.0f;
+            this.canvas.Save();
+            this.canvas.Scale(scale);
         }
 
         public SKColor Color { get; set; } = SKColors.Black;
 
         public void Dispose()
         {
-            surface.Dispose();
+            if (surface != null)
+            {
+                surface.Dispose();
+            }
+            else
+            {
+                canvas.Restore();
+            }
         }
 
         public void DrawLine(Point start, Point end, double thickness)
@@ -67,7 +84,7 @@ namespace CircuitDiagram.Render.Skia
                 StrokeCap = SKStrokeCap.Square,
             };
 
-            surface.Canvas.DrawLine(start.ToSkPoint(), end.ToSkPoint(), paint);
+            canvas.DrawLine(start.ToSkPoint(), end.ToSkPoint(), paint);
         }
 
         public void DrawRectangle(Point start, Size size, double thickness, bool fill = false)
@@ -81,7 +98,7 @@ namespace CircuitDiagram.Render.Skia
                 StrokeCap = SKStrokeCap.Square,
             };
 
-            surface.Canvas.DrawRect((float)start.X, (float)start.Y, (float)size.Width, (float)size.Height, paint);
+            canvas.DrawRect((float)start.X, (float)start.Y, (float)size.Width, (float)size.Height, paint);
         }
 
         public void DrawEllipse(Point centre, double radiusX, double radiusY, double thickness, bool fill = false)
@@ -95,7 +112,7 @@ namespace CircuitDiagram.Render.Skia
                 StrokeCap = SKStrokeCap.Square,
             };
 
-            surface.Canvas.DrawOval(centre.ToSkPoint(), new SKSize((float)radiusX, (float)radiusY), paint);
+            canvas.DrawOval(centre.ToSkPoint(), new SKSize((float)radiusX, (float)radiusY), paint);
         }
 
         public void DrawPath(Point start, IList<IPathCommand> commands, double thickness, bool fill = false)
@@ -161,7 +178,7 @@ namespace CircuitDiagram.Render.Skia
                 StrokeCap = SKStrokeCap.Square,
             };
 
-            surface.Canvas.DrawPath(path, paint);
+            canvas.DrawPath(path, paint);
         }
 
         public void DrawText(Point anchor, TextAlignment alignment, double rotation, IList<TextRun> textRuns)
@@ -178,8 +195,10 @@ namespace CircuitDiagram.Render.Skia
             };
 
             float totalWidth = 0f;
-            float totalHeight = 0f;
+            float maxAscent = 0f;
+            float maxDescent = 0f;
 
+            // First pass: Measure
             foreach (TextRun run in textRuns)
             {
                 if (string.IsNullOrEmpty(run.Text))
@@ -191,16 +210,18 @@ namespace CircuitDiagram.Render.Skia
                     run.Formatting.FormattingType == TextRunFormattingType.Superscript)
                     paint.TextSize /= 1.5f;
 
-                var bounds = new SKRect();
-                paint.MeasureText(Encoding.UTF8.GetBytes(run.Text), ref bounds);
-                totalWidth += bounds.Right;
-                totalHeight = Math.Max(totalHeight, bounds.Height);
+                totalWidth += paint.MeasureText(run.Text);
+                
+                paint.GetFontMetrics(out var metrics);
+                maxAscent = Math.Max(maxAscent, -metrics.Ascent);
+                maxDescent = Math.Max(maxDescent, metrics.Descent);
             }
 
+            float totalHeight = maxAscent + maxDescent;
             var startLocation = anchor.ToSkPoint();
 
-            surface.Canvas.Save();
-            surface.Canvas.RotateDegrees((float)rotation, startLocation.X, startLocation.Y);
+            canvas.Save();
+            canvas.RotateDegrees((float)rotation, startLocation.X, startLocation.Y);
 
             // Horizontal alignment
             if (alignment == TextAlignment.TopCentre || alignment == TextAlignment.CentreCentre || alignment == TextAlignment.BottomCentre)
@@ -210,9 +231,11 @@ namespace CircuitDiagram.Render.Skia
 
             // Vertical alignment
             if (alignment == TextAlignment.TopLeft || alignment == TextAlignment.TopCentre || alignment == TextAlignment.TopRight)
-                startLocation.Y += totalHeight;
-            if (alignment == TextAlignment.CentreLeft || alignment == TextAlignment.CentreCentre || alignment == TextAlignment.CentreRight)
-                startLocation.Y += totalHeight / 2;
+                startLocation.Y += maxAscent;
+            else if (alignment == TextAlignment.CentreLeft || alignment == TextAlignment.CentreCentre || alignment == TextAlignment.CentreRight)
+                startLocation.Y += maxAscent - totalHeight / 2;
+            else if (alignment == TextAlignment.BottomLeft || alignment == TextAlignment.BottomCentre || alignment == TextAlignment.BottomRight)
+                startLocation.Y -= maxDescent;
 
             float horizontalOffsetCounter = 0;
             foreach (TextRun run in textRuns)
@@ -226,31 +249,31 @@ namespace CircuitDiagram.Render.Skia
                 if (run.Formatting.FormattingType == TextRunFormattingType.Subscript)
                 {
                     paint.TextSize /= 1.5f;
-                    renderLocation.Y = renderLocation.Y + 3f;
+                    renderLocation.Y += maxAscent * 0.3f;
                 }
                 else if (run.Formatting.FormattingType == TextRunFormattingType.Superscript)
                 {
                     paint.TextSize /= 1.5f;
-                    renderLocation.Y = renderLocation.Y - 3f;
+                    renderLocation.Y -= maxAscent * 0.4f;
                 }
 
-                var bounds = new SKRect();
-                paint.MeasureText(run.Text, ref bounds);
-
-                surface.Canvas.DrawText(run.Text, renderLocation.X, renderLocation.Y, paint);
-                horizontalOffsetCounter += bounds.Right;
+                canvas.DrawText(run.Text, renderLocation.X, renderLocation.Y, paint);
+                horizontalOffsetCounter += paint.MeasureText(run.Text);
             }
 
-            surface.Canvas.Restore();
+            canvas.Restore();
         }
 
         public void Mutate(Action<SKCanvas> action)
         {
-            action(surface.Canvas);
+            action(canvas);
         }
 
         public void WriteAsPng(Stream stream)
         {
+            if (surface == null)
+                throw new NotSupportedException("Cannot write to PNG when using an external canvas.");
+
             using (var image = surface.Snapshot())
             using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
             {

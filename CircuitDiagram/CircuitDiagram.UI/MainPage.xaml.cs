@@ -250,7 +250,7 @@ public partial class MainPage : ContentPage
 
         if (_circuit != null && _renderer != null)
         {
-            using (var context = new MauiDrawingContext(canvas))
+            using (var context = new SkiaDrawingContext(canvas))
             {
                 try 
                 {
