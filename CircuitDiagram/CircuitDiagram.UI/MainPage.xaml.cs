@@ -253,7 +253,7 @@ public partial class MainPage : ContentPage
         if (_circuit != null && _renderer != null)
         {
             // Use scale 2.0 to match grid size (20px vs 10 units)
-            using (var context = new SkiaDrawingContext(canvas, 2.0f))
+            using (var context = new SkiaDrawingContext(canvas, RenderScale))
             {
                 try 
                 {
@@ -526,9 +526,12 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private const float RenderScale = 2.0f;
+
     private void OnTouch(object sender, SKTouchEventArgs e)
     {
-        var touchPoint = new CDPoint(e.Location.X, e.Location.Y);
+        // Convert screen coordinates to logical coordinates
+        var touchPoint = new CDPoint(e.Location.X / RenderScale, e.Location.Y / RenderScale);
 
         switch (e.ActionType)
         {
@@ -536,6 +539,7 @@ public partial class MainPage : ContentPage
                 // Hit test
                 _draggingComponent = _circuit.Elements
                     .OfType<PositionalComponent>()
+                    .Reverse()
                     .FirstOrDefault(c => IsHit(c, touchPoint));
                 
                 if (_draggingComponent != null)
@@ -563,15 +567,15 @@ public partial class MainPage : ContentPage
             case SKTouchAction.Moved:
                 if (_draggingComponent != null)
                 {
-                    var dx = e.Location.X - _dragStartTouch.X;
-                    var dy = e.Location.Y - _dragStartTouch.Y;
+                    var dx = (e.Location.X - _dragStartTouch.X) / RenderScale;
+                    var dy = (e.Location.Y - _dragStartTouch.Y) / RenderScale;
                     
-                    // Snap to grid (20 units)
+                    // Snap to grid (10 units logical = 20 units visual)
                     var newX = _dragStartLocation.X + dx;
                     var newY = _dragStartLocation.Y + dy;
                     
-                    newX = Math.Round(newX / 20.0) * 20.0;
-                    newY = Math.Round(newY / 20.0) * 20.0;
+                    newX = Math.Round(newX / 10.0) * 10.0;
+                    newY = Math.Round(newY / 10.0) * 10.0;
 
                     _draggingComponent.Layout.Location = new CDPoint(newX, newY);
                     canvasView.InvalidateSurface();
@@ -589,11 +593,24 @@ public partial class MainPage : ContentPage
 
     private bool IsHit(PositionalComponent component, CDPoint point)
     {
-        // Simple distance check for now
-        // Most components are drawn around their location or to the right/down
-        // Let's assume a hit box around the location
-        var dist = Math.Sqrt(Math.Pow(component.Layout.Location.X - point.X, 2) + Math.Pow(component.Layout.Location.Y - point.Y, 2));
-        return dist < 40; // 40 units radius
+        try
+        {
+            var boundsContext = new BoundsDrawingContext();
+            _renderer.RenderComponent(component, boundsContext, ignoreOffset: false);
+            var bounds = boundsContext.Bounds;
+
+            // Add a small margin
+            double margin = 5.0;
+
+            return point.X >= bounds.X - margin &&
+                   point.X <= bounds.X + bounds.Width + margin &&
+                   point.Y >= bounds.Y - margin &&
+                   point.Y <= bounds.Y + bounds.Height + margin;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
