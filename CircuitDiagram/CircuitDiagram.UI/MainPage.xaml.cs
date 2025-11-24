@@ -25,6 +25,10 @@ using CircuitDiagram.UI.Services;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Storage;
 using Microsoft.Maui.Devices;
+using Microsoft.Maui.ApplicationModel.DataTransfer;
+using CommunityToolkit.Maui.Storage;
+using System.Threading;
+using System.Collections.Specialized;
 
 namespace CircuitDiagram.UI;
 
@@ -34,6 +38,7 @@ public partial class MainPage : ContentPage
     private CircuitRenderer _renderer = null!;
     private DictionaryComponentDescriptionLookup _lookup = null!;
     private ComponentService _componentService;
+    private string? _currentFilePath;
 
     public ObservableCollection<LayerViewModel> Layers { get; set; } = new ObservableCollection<LayerViewModel>();
 
@@ -81,9 +86,36 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         InitializeCircuit();
         _componentService = new ComponentService();
+        _componentService.Components.CollectionChanged += OnComponentsCollectionChanged;
         componentsList.ItemsSource = _componentService.Components;
         layersList.ItemsSource = Layers;
         LoadComponents();
+    }
+
+    private void OnComponentsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems != null)
+        {
+            foreach (ComponentItem item in e.NewItems)
+            {
+                if (item?.Description == null) continue;
+
+                var description = item.Description;
+                var componentType = new TypeDescriptionComponentType(
+                    description.Metadata.GUID, 
+                    new Uri("http://circuit-diagram.org/components"), 
+                    description.ComponentName);
+                
+                try 
+                {
+                     _lookup.AddDescription(componentType, description);
+                }
+                catch (Exception) 
+                {
+                    // Ignore duplicates or errors
+                }
+            }
+        }
     }
 
     private void InitializeCircuit()
@@ -814,6 +846,164 @@ public partial class MainPage : ContentPage
         if (sender is Entry entry && entry.BindingContext is LayerViewModel layer)
         {
             layer.FinishEditCommand.Execute(null);
+        }
+    }
+
+    private async void OnImportClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select Circuit Diagram",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.iOS, new[] { "public.data" } },
+                    { DevicePlatform.Android, new[] { "*/*" } },
+                    { DevicePlatform.WinUI, new[] { ".cddx" } },
+                    { DevicePlatform.macOS, new[] { "cddx" } },
+                    { DevicePlatform.MacCatalyst, new[] { "cddx" } }
+                })
+            });
+
+            if (result != null)
+            {
+                await LoadCircuitAsync(result.FullPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Failed to import: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task LoadCircuitAsync(string filePath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            var reader = new CircuitDiagramDocumentReader();
+            var document = reader.ReadCircuit(stream);
+            
+            _circuit = document;
+            _currentFilePath = filePath;
+            
+            // Rebuild Layers
+            Layers.Clear();
+            foreach (var element in _circuit.Elements)
+            {
+                if (element is PositionalComponent component)
+                {
+                    AddLayer(component);
+                }
+            }
+            
+            canvasView.InvalidateSurface();
+            await DisplayAlert("Success", "Circuit loaded successfully.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Failed to load circuit: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnReloadClicked(object sender, EventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentFilePath))
+        {
+            await DisplayAlert("Info", "No file currently loaded to reload.", "OK");
+            return;
+        }
+        
+        await LoadCircuitAsync(_currentFilePath);
+    }
+
+    private async void OnSaveClicked(object sender, EventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentFilePath))
+        {
+            OnExportClicked(sender, e);
+            return;
+        }
+
+        try
+        {
+            using var stream = File.Create(_currentFilePath);
+            var writer = new CircuitDiagramDocumentWriter();
+            writer.WriteCircuit(_circuit, stream);
+            await DisplayAlert("Success", "Circuit saved successfully.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Failed to save: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnExportClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            using var stream = new MemoryStream();
+            var writer = new CircuitDiagramDocumentWriter();
+            writer.WriteCircuit(_circuit, stream);
+            stream.Position = 0;
+
+            var fileSaverResult = await FileSaver.Default.SaveAsync("Circuit.cddx", stream, CancellationToken.None);
+            if (fileSaverResult.IsSuccessful)
+            {
+                await DisplayAlert("Success", $"File saved: {fileSaverResult.FilePath}", "OK");
+                _currentFilePath = fileSaverResult.FilePath;
+            }
+            else
+            {
+                if (fileSaverResult.Exception != null)
+                {
+                    await DisplayAlert("Error", $"Failed to save: {fileSaverResult.Exception.Message}", "OK");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Failed to export: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnExportImageClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            int width = 2000;
+            int height = 2000;
+
+            using var bitmap = new SKBitmap(width, height);
+            using var canvas = new SKCanvas(bitmap);
+            canvas.Clear(SKColors.White);
+            
+            using (var context = new SkiaDrawingContext(canvas, 1.0f))
+            {
+                _renderer.RenderCircuit(_circuit, context);
+            }
+
+            using var image = SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using var stream = data.AsStream();
+
+            var fileSaverResult = await FileSaver.Default.SaveAsync("Circuit.png", stream, CancellationToken.None);
+            if (fileSaverResult.IsSuccessful)
+            {
+                await DisplayAlert("Success", $"Image saved: {fileSaverResult.FilePath}", "OK");
+            }
+            else
+            {
+                if (fileSaverResult.Exception != null)
+                {
+                    await DisplayAlert("Error", $"Failed to save image: {fileSaverResult.Exception.Message}", "OK");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Failed to export image: {ex.Message}", "OK");
         }
     }
 }
