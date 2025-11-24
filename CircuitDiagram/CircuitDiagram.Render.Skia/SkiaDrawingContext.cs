@@ -51,10 +51,10 @@ namespace CircuitDiagram.Render.Skia
             canvas = surface.Canvas;
         }
 
-        public SkiaDrawingContext(SKCanvas canvas, float scale = 1.0f)
+        public SkiaDrawingContext(SKCanvas canvas, float scale = 1.0f, float fontSizeScale = 1.0f)
         {
             this.canvas = canvas;
-            this.fontSizeScale = 1.0f;
+            this.fontSizeScale = fontSizeScale;
             this.canvas.Save();
             this.canvas.Scale(scale);
         }
@@ -194,71 +194,106 @@ namespace CircuitDiagram.Render.Skia
                 IsLinearText = rotation != 0.0,
             };
 
-            float totalWidth = 0f;
-            float maxAscent = 0f;
-            float maxDescent = 0f;
+            // Calculate vertical metrics
+            float minTop = 0f;
+            float maxBottom = 0f;
+            bool first = true;
 
-            // First pass: Measure
             foreach (TextRun run in textRuns)
             {
-                if (string.IsNullOrEmpty(run.Text))
-                    continue;
-
+                if (string.IsNullOrEmpty(run.Text)) continue;
+                
                 paint.TextSize = (float)run.Formatting.Size * fontSizeScale;
-
-                if (run.Formatting.FormattingType == TextRunFormattingType.Subscript ||
-                    run.Formatting.FormattingType == TextRunFormattingType.Superscript)
+                if (run.Formatting.FormattingType != TextRunFormattingType.Normal)
                     paint.TextSize /= 1.5f;
 
-                totalWidth += paint.MeasureText(run.Text);
-                
-                paint.GetFontMetrics(out var metrics);
-                maxAscent = Math.Max(maxAscent, -metrics.Ascent);
-                maxDescent = Math.Max(maxDescent, metrics.Descent);
+                var bounds = new SKRect();
+                paint.MeasureText(run.Text, ref bounds);
+
+                if (first) { minTop = bounds.Top; maxBottom = bounds.Bottom; first = false; }
+                else { minTop = Math.Min(minTop, bounds.Top); maxBottom = Math.Max(maxBottom, bounds.Bottom); }
             }
 
-            float totalHeight = maxAscent + maxDescent;
             var startLocation = anchor.ToSkPoint();
-
             canvas.Save();
             canvas.RotateDegrees((float)rotation, startLocation.X, startLocation.Y);
 
-            // Horizontal alignment
-            if (alignment == TextAlignment.TopCentre || alignment == TextAlignment.CentreCentre || alignment == TextAlignment.BottomCentre)
-                startLocation.X -= totalWidth / 2;
-            else if (alignment == TextAlignment.TopRight || alignment == TextAlignment.CentreRight || alignment == TextAlignment.BottomRight)
-                startLocation.X -= totalWidth;
-
             // Vertical alignment
+            float yOffset = 0;
             if (alignment == TextAlignment.TopLeft || alignment == TextAlignment.TopCentre || alignment == TextAlignment.TopRight)
-                startLocation.Y += maxAscent;
+                yOffset = -minTop;
             else if (alignment == TextAlignment.CentreLeft || alignment == TextAlignment.CentreCentre || alignment == TextAlignment.CentreRight)
-                startLocation.Y += maxAscent - totalHeight / 2;
+                yOffset = -(minTop + maxBottom) / 2;
             else if (alignment == TextAlignment.BottomLeft || alignment == TextAlignment.BottomCentre || alignment == TextAlignment.BottomRight)
-                startLocation.Y -= maxDescent;
+                yOffset = -maxBottom;
 
-            float horizontalOffsetCounter = 0;
-            foreach (TextRun run in textRuns)
+            startLocation.Y += yOffset;
+
+            if (textRuns.Count == 1)
             {
-                if (string.IsNullOrEmpty(run.Text))
-                    continue;
+                // Use native Skia alignment for single run (most common and accurate)
+                if (alignment == TextAlignment.TopCentre || alignment == TextAlignment.CentreCentre || alignment == TextAlignment.BottomCentre)
+                    paint.TextAlign = SKTextAlign.Center;
+                else if (alignment == TextAlignment.TopRight || alignment == TextAlignment.CentreRight || alignment == TextAlignment.BottomRight)
+                    paint.TextAlign = SKTextAlign.Right;
+                else
+                    paint.TextAlign = SKTextAlign.Left;
 
+                var run = textRuns[0];
                 paint.TextSize = (float)run.Formatting.Size * fontSizeScale;
-                var renderLocation = new SKPoint(startLocation.X + horizontalOffsetCounter, startLocation.Y);
-
+                
                 if (run.Formatting.FormattingType == TextRunFormattingType.Subscript)
                 {
                     paint.TextSize /= 1.5f;
-                    renderLocation.Y += maxAscent * 0.3f;
+                    startLocation.Y += (maxBottom - minTop) * 0.3f;
                 }
                 else if (run.Formatting.FormattingType == TextRunFormattingType.Superscript)
                 {
                     paint.TextSize /= 1.5f;
-                    renderLocation.Y -= maxAscent * 0.4f;
+                    startLocation.Y -= (maxBottom - minTop) * 0.4f;
                 }
 
-                canvas.DrawText(run.Text, renderLocation.X, renderLocation.Y, paint);
-                horizontalOffsetCounter += paint.MeasureText(run.Text);
+                canvas.DrawText(run.Text, startLocation.X, startLocation.Y, paint);
+            }
+            else
+            {
+                // Manual layout for multiple runs
+                paint.TextAlign = SKTextAlign.Left;
+                
+                float totalWidth = 0;
+                foreach (var run in textRuns) 
+                {
+                    paint.TextSize = (float)run.Formatting.Size * fontSizeScale;
+                    if (run.Formatting.FormattingType != TextRunFormattingType.Normal) paint.TextSize /= 1.5f;
+                    totalWidth += paint.MeasureText(run.Text);
+                }
+
+                if (alignment == TextAlignment.TopCentre || alignment == TextAlignment.CentreCentre || alignment == TextAlignment.BottomCentre)
+                    startLocation.X -= totalWidth / 2;
+                else if (alignment == TextAlignment.TopRight || alignment == TextAlignment.CentreRight || alignment == TextAlignment.BottomRight)
+                    startLocation.X -= totalWidth;
+
+                foreach (TextRun run in textRuns)
+                {
+                    if (string.IsNullOrEmpty(run.Text)) continue;
+
+                    paint.TextSize = (float)run.Formatting.Size * fontSizeScale;
+                    float currentY = startLocation.Y;
+
+                    if (run.Formatting.FormattingType == TextRunFormattingType.Subscript)
+                    {
+                        paint.TextSize /= 1.5f;
+                        currentY += (maxBottom - minTop) * 0.3f;
+                    }
+                    else if (run.Formatting.FormattingType == TextRunFormattingType.Superscript)
+                    {
+                        paint.TextSize /= 1.5f;
+                        currentY -= (maxBottom - minTop) * 0.4f;
+                    }
+
+                    canvas.DrawText(run.Text, startLocation.X, currentY, paint);
+                    startLocation.X += paint.MeasureText(run.Text);
+                }
             }
 
             canvas.Restore();

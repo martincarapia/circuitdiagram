@@ -155,6 +155,7 @@ public partial class MainPage : ContentPage
         }
         
         var component = new PositionalComponent(componentType);
+        component.Layout.Size = description.MinSize;
         component.Layout.Location = new CDPoint(100, 100); 
         _circuit.Elements.Add(component);
         AddLayer(component);
@@ -207,6 +208,7 @@ public partial class MainPage : ContentPage
                     
                     // Create an instance of the component
                     var component = new PositionalComponent(componentType);
+                    component.Layout.Size = description.MinSize;
                     component.Layout.Location = new CDPoint(200, 200); // Place it somewhere visible
                     _circuit.Elements.Add(component);
                     AddLayer(component);
@@ -250,7 +252,8 @@ public partial class MainPage : ContentPage
 
         if (_circuit != null && _renderer != null)
         {
-            using (var context = new SkiaDrawingContext(canvas))
+            // Use scale 2.0 to match grid size (20px vs 10 units)
+            using (var context = new SkiaDrawingContext(canvas, 2.0f))
             {
                 try 
                 {

@@ -113,12 +113,13 @@ public class ComponentService
         var renderer = new CircuitRenderer(lookup);
         
         var component = new PositionalComponent(type);
+        component.Layout.Size = description.MinSize;
         // Center the component roughly. 
         // Most components are drawn relative to (0,0) or centered.
-        // Let's put it at center.
-        component.Layout.Location = new CDPoint(width / 2, height / 2);
+        // We scale by 2.0, so we need to position at (width/2)/2 = width/4
+        component.Layout.Location = new CDPoint(width / 4, height / 4);
         
-        using (var context = new SkiaDrawingContext(canvas))
+        using (var context = new SkiaDrawingContext(canvas, 2.0f))
         {
             context.Color = SKColors.Black;
             renderer.RenderComponent(component, context, ignoreOffset: false);
