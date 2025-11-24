@@ -39,11 +39,40 @@
                 <BoxView Grid.Row="0" VerticalOptions="End" HeightRequest="1" Color="#E0E0E0"/>
 
                 <!-- List -->
-                <CollectionView x:Name="layersList" Grid.Row="1" BackgroundColor="White" SelectionMode="Single" SelectionChanged="OnLayerSelected">
+                <CollectionView x:Name="layersList" Grid.Row="1" BackgroundColor="White" SelectionMode="Multiple" SelectionChanged="OnLayerSelected">
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
-                            <Grid Padding="10">
-                                <Label Text="{Binding Name}" VerticalOptions="Center" TextColor="Black"/>
+                            <Grid ColumnDefinitions="Auto,Auto,*" Padding="5">
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup Name="CommonStates">
+                                        <VisualState Name="Normal">
+                                            <VisualState.Setters>
+                                                <Setter Property="BackgroundColor" Value="Transparent" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState Name="Selected">
+                                            <VisualState.Setters>
+                                                <Setter Property="BackgroundColor" Value="#E3F2FD" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                                <Label Text="{Binding ExpandIcon}" VerticalOptions="Center" Margin="{Binding Indentation}" TextColor="#666666" WidthRequest="20" HorizontalTextAlignment="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding ToggleExpandCommand}" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Label Grid.Column="1" Text="{Binding Icon}" VerticalOptions="Center" Margin="0,0,5,0" TextColor="Black"/>
+                                
+                                <Grid Grid.Column="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Name}" TextColor="Black" IsVisible="{Binding IsNotEditing}">
+                                        <Label.GestureRecognizers>
+                                            <TapGestureRecognizer NumberOfTapsRequired="2" Command="{Binding StartEditCommand}" />
+                                        </Label.GestureRecognizers>
+                                    </Label>
+                                    <Entry Text="{Binding Name}" TextColor="Black" IsVisible="{Binding IsEditing}" BackgroundColor="White"
+                                           ReturnCommand="{Binding FinishEditCommand}" Unfocused="OnRenameEntryUnfocused" />
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
@@ -56,7 +85,8 @@
                             HeightRequest="30" WidthRequest="30" Padding="0"
                             Clicked="OnDeleteSelectedLayerClicked"/>
                     <Button Text="📁" BackgroundColor="Transparent" TextColor="#666666" 
-                            HeightRequest="30" WidthRequest="30" Padding="0"/>
+                            HeightRequest="30" WidthRequest="30" Padding="0"
+                            Clicked="OnGroupClicked"/>
                     <Button Text="📂" BackgroundColor="Transparent" TextColor="#666666" 
                             HeightRequest="30" WidthRequest="30" Padding="0"/>
                     <Button Text="⧉" BackgroundColor="Transparent" TextColor="#666666" 

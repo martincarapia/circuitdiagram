@@ -5,6 +5,8 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using CircuitDiagram.Circuit;
 using CircuitDiagram.Render;
 using CircuitDiagram.Render.Skia;
@@ -43,6 +45,27 @@ public partial class MainPage : ContentPage
             Component = component
         };
         Layers.Add(layer);
+    }
+
+    private void UpdateSelection()
+    {
+        _selectedComponents.Clear();
+        
+        foreach (var layer in _selectedLayers)
+        {
+            if (layer.Component != null) _selectedComponents.Add(layer.Component);
+            if (layer.IsGroup) AddGroupComponentsToSelection(layer);
+        }
+        canvasView.InvalidateSurface();
+    }
+
+    private void AddGroupComponentsToSelection(LayerViewModel group)
+    {
+        foreach (var child in group.Children)
+        {
+            if (child.Component != null) _selectedComponents.Add(child.Component);
+            if (child.IsGroup) AddGroupComponentsToSelection(child);
+        }
     }
 
     private void DeleteLayer(PositionalComponent component)
@@ -234,7 +257,7 @@ public partial class MainPage : ContentPage
                     _renderer.RenderCircuit(_circuit, context);
 
                     // Draw selection highlight
-                    if (_selectedComponent != null)
+                    if (_selectedComponents.Any())
                     {
                         var paint = new SKPaint
                         {
@@ -242,8 +265,11 @@ public partial class MainPage : ContentPage
                             Style = SKPaintStyle.Stroke,
                             StrokeWidth = 2
                         };
-                        var loc = _selectedComponent.Layout.Location;
-                        canvas.DrawRect((float)loc.X - 25, (float)loc.Y - 25, 50, 50, paint);
+                        foreach (var component in _selectedComponents)
+                        {
+                            var loc = component.Layout.Location;
+                            canvas.DrawRect((float)loc.X - 25, (float)loc.Y - 25, 50, 50, paint);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -281,31 +307,203 @@ public partial class MainPage : ContentPage
     }
 
     private PositionalComponent? _draggingComponent;
-    private PositionalComponent? _selectedComponent;
+    private List<PositionalComponent> _selectedComponents = new List<PositionalComponent>();
     private CDPoint _dragStartLocation;
     private SKPoint _dragStartTouch;
 
+    private List<LayerViewModel> _selectedLayers = new List<LayerViewModel>();
+
     private void OnLayerSelected(object sender, SelectionChangedEventArgs e)
     {
-        var layer = e.CurrentSelection.FirstOrDefault() as LayerViewModel;
-        if (layer != null)
+        // Deselect previous
+        foreach (var layer in _selectedLayers)
         {
-            _selectedComponent = layer.Component;
+            layer.IsSelected = false;
         }
-        else
+
+        _selectedLayers = e.CurrentSelection.Cast<LayerViewModel>().ToList();
+        
+        // Select new
+        foreach (var layer in _selectedLayers)
         {
-            _selectedComponent = null;
+            layer.IsSelected = true;
         }
-        canvasView.InvalidateSurface();
+
+        UpdateSelection();
     }
 
     private void OnDeleteSelectedLayerClicked(object sender, EventArgs e)
     {
-        if (_selectedComponent != null)
+        var layersToDelete = _selectedLayers.ToList(); // Copy
+        foreach (var layer in layersToDelete)
         {
-            DeleteLayer(_selectedComponent);
-            _selectedComponent = null;
-            layersList.SelectedItem = null;
+            if (layer.IsGroup)
+            {
+                DeleteGroup(layer);
+            }
+            else if (layer.Component != null)
+            {
+                DeleteLayer(layer.Component);
+            }
+        }
+        _selectedLayers.Clear();
+        layersList.SelectedItems = null;
+    }
+
+    private void DeleteGroup(LayerViewModel group)
+    {
+        // Remove children components from circuit
+        foreach (var child in group.Children)
+        {
+            if (child.Component != null)
+            {
+                _circuit.Elements.Remove(child.Component);
+            }
+        }
+        
+        // Remove from UI
+        if (group.IsExpanded)
+        {
+            foreach (var child in group.Children)
+            {
+                Layers.Remove(child);
+            }
+        }
+        Layers.Remove(group);
+        canvasView.InvalidateSurface();
+    }
+
+    private void OnGroupClicked(object sender, EventArgs e)
+    {
+        // Use _selectedLayers instead of layersList.SelectedItems
+        var selectedLayers = _selectedLayers.ToList();
+        if (selectedLayers == null || selectedLayers.Count < 2) return;
+
+        // Create new group
+        var group = new LayerViewModel
+        {
+            Name = "Folder",
+            IsGroup = true,
+            IsExpanded = true
+        };
+        // group.ToggleSelectionCommand = new Command(() => ToggleLayerSelection(group)); // Removed as we use native selection
+
+        // Find insertion index (use the first selected item's index)
+        var firstIndex = Layers.IndexOf(selectedLayers.First());
+        if (firstIndex == -1) firstIndex = Layers.Count;
+
+        // Remove selected layers from root and add to group
+        foreach (var layer in selectedLayers)
+        {
+            Layers.Remove(layer);
+            layer.Level = 1; // Increase indentation
+            layer.Parent = group;
+            group.Children.Add(layer);
+        }
+
+        // Insert group
+        Layers.Insert(firstIndex, group);
+        
+        // Re-insert children after group
+        int index = firstIndex + 1;
+        foreach (var child in group.Children)
+        {
+            Layers.Insert(index++, child);
+        }
+        
+        // Update toggle command for the group
+        group.ToggleExpandCommand = new Command(() => ToggleGroup(group));
+        
+        // Clear selection and select the new group?
+        foreach(var l in selectedLayers) l.IsSelected = false;
+        group.IsSelected = true;
+        UpdateSelection();
+    }
+
+    private void ToggleGroup(LayerViewModel group)
+    {
+        if (!group.IsGroup) return;
+
+        group.IsExpanded = !group.IsExpanded;
+        var index = Layers.IndexOf(group);
+        
+        if (group.IsExpanded)
+        {
+            // Insert children
+            var insertIndex = index + 1;
+            foreach (var child in group.Children)
+            {
+                Layers.Insert(insertIndex++, child);
+            }
+        }
+        else
+        {
+            // Remove children
+            foreach (var child in group.Children)
+            {
+                Layers.Remove(child);
+            }
+        }
+    }
+
+    private LayerViewModel? FindLayerForComponent(PositionalComponent component)
+    {
+        // Search visible layers first
+        var visible = Layers.FirstOrDefault(l => l.Component == component);
+        if (visible != null) return visible;
+        
+        // Search recursively in all root layers (Level 0)
+        foreach (var layer in Layers.Where(l => l.Level == 0))
+        {
+            var found = FindLayerInTree(layer, component);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private LayerViewModel? FindLayerInTree(LayerViewModel root, PositionalComponent component)
+    {
+        if (root.Component == component) return root;
+        foreach (var child in root.Children)
+        {
+            var found = FindLayerInTree(child, component);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void ExpandPathToLayer(LayerViewModel layer)
+    {
+        var current = layer.Parent;
+        while (current != null)
+        {
+            if (!current.IsExpanded)
+            {
+                // Expand it
+                current.IsExpanded = true;
+                // We need to insert children into Layers if they are not there
+                // But ToggleGroup handles this logic if we call the command or replicate logic.
+                // Let's replicate logic or call ToggleGroup if we can ensure state consistency.
+                // Actually, ToggleGroup toggles based on current state.
+                // If IsExpanded is already true (set above), ToggleGroup logic might be confused if we just call it?
+                // No, ToggleGroup checks IsExpanded.
+                
+                // Let's just manually insert children if needed.
+                // Find index of current
+                var index = Layers.IndexOf(current);
+                if (index != -1)
+                {
+                    var insertIndex = index + 1;
+                    foreach (var child in current.Children)
+                    {
+                        if (!Layers.Contains(child))
+                        {
+                            Layers.Insert(insertIndex++, child);
+                        }
+                    }
+                }
+            }
+            current = current.Parent;
         }
     }
 
@@ -317,17 +515,20 @@ public partial class MainPage : ContentPage
         {
             case SKTouchAction.Pressed:
                 // Hit test
-                // Simple hit test: find component closest to touch point within a threshold
                 _draggingComponent = _circuit.Elements
                     .OfType<PositionalComponent>()
                     .FirstOrDefault(c => IsHit(c, touchPoint));
                 
                 if (_draggingComponent != null)
                 {
-                    _selectedComponent = _draggingComponent;
-                    // Sync with list
-                    var layer = Layers.FirstOrDefault(l => l.Component == _selectedComponent);
-                    layersList.SelectedItem = layer;
+                    var layer = FindLayerForComponent(_draggingComponent);
+                    if (layer != null)
+                    {
+                        ExpandPathToLayer(layer);
+                        
+                        // Single select: replace selection
+                        layersList.SelectedItems = new ObservableCollection<object> { layer };
+                    }
 
                     _dragStartLocation = _draggingComponent.Layout.Location;
                     _dragStartTouch = e.Location;
@@ -335,8 +536,7 @@ public partial class MainPage : ContentPage
                 }
                 else
                 {
-                    _selectedComponent = null;
-                    layersList.SelectedItem = null;
+                    layersList.SelectedItems = null; // Clear selection
                 }
                 canvasView.InvalidateSurface();
                 break;
@@ -392,6 +592,14 @@ public partial class MainPage : ContentPage
                 .ToList();
         }
     }
+
+    private void OnRenameEntryUnfocused(object sender, FocusEventArgs e)
+    {
+        if (sender is Entry entry && entry.BindingContext is LayerViewModel layer)
+        {
+            layer.FinishEditCommand.Execute(null);
+        }
+    }
 }
 
 public class StringListLogger : IXmlLoadLogger
@@ -407,8 +615,94 @@ public class StringListLogger : IXmlLoadLogger
     }
 }
 
-public class LayerViewModel
+public class LayerViewModel : INotifyPropertyChanged
 {
-    public string? Name { get; set; }
+    public LayerViewModel()
+    {
+        StartEditCommand = new Command(() => IsEditing = true);
+        FinishEditCommand = new Command(() => IsEditing = false);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private string? _name;
+    public string? Name 
+    { 
+        get => _name; 
+        set { _name = value; OnPropertyChanged(); } 
+    }
+
     public PositionalComponent? Component { get; set; }
+    public ObservableCollection<LayerViewModel> Children { get; set; } = new ObservableCollection<LayerViewModel>();
+    
+    private bool _isGroup;
+    public bool IsGroup 
+    { 
+        get => _isGroup; 
+        set 
+        { 
+            _isGroup = value; 
+            OnPropertyChanged(); 
+            OnPropertyChanged(nameof(Icon)); 
+            OnPropertyChanged(nameof(ExpandIcon));
+        } 
+    }
+
+    private bool _isExpanded = true;
+    public bool IsExpanded 
+    { 
+        get => _isExpanded; 
+        set 
+        { 
+            _isExpanded = value; 
+            OnPropertyChanged(); 
+            OnPropertyChanged(nameof(Icon)); 
+            OnPropertyChanged(nameof(ExpandIcon));
+        } 
+    }
+
+    private bool _isEditing;
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set
+        {
+            _isEditing = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsNotEditing));
+        }
+    }
+
+    public bool IsNotEditing => !IsEditing;
+
+    public int Level { get; set; } = 0;
+    public Thickness Indentation => new Thickness(Level * 20, 0, 0, 0);
+    
+    public string ExpandIcon => IsGroup ? (IsExpanded ? "▼" : "▶") : " ";
+    public string Icon => IsGroup ? (IsExpanded ? "📂" : "📁") : "📄";
+    
+    public ICommand? ToggleExpandCommand { get; set; }
+    public ICommand StartEditCommand { get; private set; }
+    public ICommand FinishEditCommand { get; private set; }
+    public ICommand? ToggleSelectionCommand { get; set; }
+
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public LayerViewModel? Parent { get; set; }
 }
