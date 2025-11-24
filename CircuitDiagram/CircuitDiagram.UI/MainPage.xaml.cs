@@ -276,7 +276,17 @@ public partial class MainPage : ContentPage
     private void OnWireModeClicked(object sender, EventArgs e)
     {
         _isWireMode = !_isWireMode;
-        ((Button)sender).BackgroundColor = _isWireMode ? Colors.LightBlue : Colors.Transparent;
+        var button = (Button)sender;
+        if (_isWireMode)
+        {
+            button.BackgroundColor = Colors.LightBlue;
+            button.TextColor = Colors.Black;
+        }
+        else
+        {
+            button.ClearValue(Button.BackgroundColorProperty);
+            button.ClearValue(Button.TextColorProperty);
+        }
         
         // Clear selection when entering wire mode
         if (_isWireMode)

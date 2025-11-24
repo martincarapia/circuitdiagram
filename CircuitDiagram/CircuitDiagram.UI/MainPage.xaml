@@ -8,7 +8,7 @@
         <HorizontalStackLayout Spacing="10" Margin="10" Grid.ColumnSpan="3">
             <Button Text="Load Component" Clicked="OnLoadComponentClicked"/>
             <Button Text="Render Circuit" Clicked="OnRenderClicked"/>
-            <Button Text="Wire Mode" Clicked="OnWireModeClicked" BackgroundColor="Transparent" BorderColor="Gray" BorderWidth="1" TextColor="Black"/>
+            <Button Text="Wire Mode" Clicked="OnWireModeClicked"/>
             <Button Text="Save" Clicked="OnSaveClicked"/>
             <Button Text="Reload" Clicked="OnReloadClicked"/>
             <Button Text="Import" Clicked="OnImportClicked"/>
