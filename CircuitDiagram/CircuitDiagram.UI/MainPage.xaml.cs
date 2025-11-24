@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Threading.Tasks;
+using System.Collections.ObjectModel;
+using System.Windows.Input;
 using CircuitDiagram.Circuit;
 using CircuitDiagram.Render;
 using CircuitDiagram.Render.Skia;
@@ -31,12 +33,33 @@ public partial class MainPage : ContentPage
     private DictionaryComponentDescriptionLookup _lookup = null!;
     private ComponentService _componentService;
 
+    public ObservableCollection<LayerViewModel> Layers { get; set; } = new ObservableCollection<LayerViewModel>();
+
+    private void AddLayer(PositionalComponent component)
+    {
+        var layer = new LayerViewModel
+        {
+            Name = component.Type.CollectionItem,
+            Component = component
+        };
+        Layers.Add(layer);
+    }
+
+    private void DeleteLayer(PositionalComponent component)
+    {
+        _circuit.Elements.Remove(component);
+        var layer = Layers.FirstOrDefault(l => l.Component == component);
+        if (layer != null) Layers.Remove(layer);
+        canvasView.InvalidateSurface();
+    }
+
     public MainPage()
     {
         InitializeComponent();
         InitializeCircuit();
         _componentService = new ComponentService();
         componentsList.ItemsSource = _componentService.Components;
+        layersList.ItemsSource = Layers;
         LoadComponents();
     }
 
@@ -111,6 +134,7 @@ public partial class MainPage : ContentPage
         var component = new PositionalComponent(componentType);
         component.Layout.Location = new CDPoint(100, 100); 
         _circuit.Elements.Add(component);
+        AddLayer(component);
         
         canvasView.InvalidateSurface();
         
@@ -162,6 +186,7 @@ public partial class MainPage : ContentPage
                     var component = new PositionalComponent(componentType);
                     component.Layout.Location = new CDPoint(200, 200); // Place it somewhere visible
                     _circuit.Elements.Add(component);
+                    AddLayer(component);
                     
                     canvasView.InvalidateSurface();
                     await DisplayAlert("Success", $"Loaded component: {description.ComponentName}", "OK");
@@ -207,6 +232,19 @@ public partial class MainPage : ContentPage
                 try 
                 {
                     _renderer.RenderCircuit(_circuit, context);
+
+                    // Draw selection highlight
+                    if (_selectedComponent != null)
+                    {
+                        var paint = new SKPaint
+                        {
+                            Color = SKColors.Blue,
+                            Style = SKPaintStyle.Stroke,
+                            StrokeWidth = 2
+                        };
+                        var loc = _selectedComponent.Layout.Location;
+                        canvas.DrawRect((float)loc.X - 25, (float)loc.Y - 25, 50, 50, paint);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -243,8 +281,33 @@ public partial class MainPage : ContentPage
     }
 
     private PositionalComponent? _draggingComponent;
+    private PositionalComponent? _selectedComponent;
     private CDPoint _dragStartLocation;
     private SKPoint _dragStartTouch;
+
+    private void OnLayerSelected(object sender, SelectionChangedEventArgs e)
+    {
+        var layer = e.CurrentSelection.FirstOrDefault() as LayerViewModel;
+        if (layer != null)
+        {
+            _selectedComponent = layer.Component;
+        }
+        else
+        {
+            _selectedComponent = null;
+        }
+        canvasView.InvalidateSurface();
+    }
+
+    private void OnDeleteSelectedLayerClicked(object sender, EventArgs e)
+    {
+        if (_selectedComponent != null)
+        {
+            DeleteLayer(_selectedComponent);
+            _selectedComponent = null;
+            layersList.SelectedItem = null;
+        }
+    }
 
     private void OnTouch(object sender, SKTouchEventArgs e)
     {
@@ -261,10 +324,21 @@ public partial class MainPage : ContentPage
                 
                 if (_draggingComponent != null)
                 {
+                    _selectedComponent = _draggingComponent;
+                    // Sync with list
+                    var layer = Layers.FirstOrDefault(l => l.Component == _selectedComponent);
+                    layersList.SelectedItem = layer;
+
                     _dragStartLocation = _draggingComponent.Layout.Location;
                     _dragStartTouch = e.Location;
                     e.Handled = true;
                 }
+                else
+                {
+                    _selectedComponent = null;
+                    layersList.SelectedItem = null;
+                }
+                canvasView.InvalidateSurface();
                 break;
 
             case SKTouchAction.Moved:
@@ -331,4 +405,10 @@ public class StringListLogger : IXmlLoadLogger
             Errors.Add($"{level}: {message} {innerException?.Message}");
         }
     }
+}
+
+public class LayerViewModel
+{
+    public string? Name { get; set; }
+    public PositionalComponent? Component { get; set; }
 }
