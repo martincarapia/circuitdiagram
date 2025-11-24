@@ -102,8 +102,6 @@ public class ComponentService
         
         using var surface = SKSurface.Create(new SKImageInfo(width, height));
         var canvas = surface.Canvas;
-        // Use transparent background, but maybe white is better for visibility if lines are black
-        // canvas.Clear(SKColors.Transparent); 
         
         // Create a lookup for the renderer
         var lookup = new DictionaryComponentDescriptionLookup();
@@ -114,12 +112,58 @@ public class ComponentService
         
         var component = new PositionalComponent(type);
         component.Layout.Size = description.MinSize;
-        // Center the component roughly. 
-        // Most components are drawn relative to (0,0) or centered.
-        // We scale by 2.0, so we need to position at (width/2)/2 = width/4
-        component.Layout.Location = new CDPoint(width / 4, height / 4);
+        component.Layout.Location = new CDPoint(0, 0); // Start at 0,0 for measurement
+
+        // 1. Measure the component
+        var boundsContext = new BoundsDrawingContext();
+        renderer.RenderComponent(component, boundsContext, ignoreOffset: false);
+        var bounds = boundsContext.Bounds;
+
+        // 2. Calculate scale to fit
+        // We want to fit the component into the 60x60 box with some padding
+        float padding = 5.0f;
+        float availableWidth = width - (padding * 2);
+        float availableHeight = height - (padding * 2);
+
+        // Calculate the visual size (assuming 1.0 scale for now)
+        float visualWidth = (float)bounds.Width;
+        float visualHeight = (float)bounds.Height;
+
+        // If bounds are empty (e.g. invisible component), default to something reasonable
+        if (visualWidth <= 0) visualWidth = 10;
+        if (visualHeight <= 0) visualHeight = 10;
+
+        // Determine scale factor
+        // We want to scale so that the largest dimension fits
+        float scaleX = availableWidth / visualWidth;
+        float scaleY = availableHeight / visualHeight;
+        float scale = Math.Min(scaleX, scaleY);
+
+        // Cap the scale so small components don't look huge
+        // Also ensure we don't scale up too much if the component is tiny
+        scale = Math.Min(scale, 2.0f); 
+
+        // 3. Calculate position to center
+        // We need to translate the canvas so that the center of the component aligns with the center of the image
         
-        using (var context = new SkiaDrawingContext(canvas, 2.0f))
+        // Center of the component in its own local space
+        float compCenterX = (float)(bounds.X + bounds.Width / 2.0);
+        float compCenterY = (float)(bounds.Y + bounds.Height / 2.0);
+
+        // Center of the image
+        float imgCenterX = width / 2.0f;
+        float imgCenterY = height / 2.0f;
+
+        // We want: (compCenter * scale) + translate = imgCenter
+        // translate = imgCenter - (compCenter * scale)
+        float translateX = imgCenterX - (compCenterX * scale);
+        float translateY = imgCenterY - (compCenterY * scale);
+
+        // 4. Render
+        canvas.Clear(SKColors.Transparent);
+        canvas.Translate(translateX, translateY);
+        
+        using (var context = new SkiaDrawingContext(canvas, scale))
         {
             context.Color = SKColors.Black;
             renderer.RenderComponent(component, context, ignoreOffset: false);
