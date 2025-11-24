@@ -5,19 +5,29 @@
              x:Class="CircuitDiagram.UI.MainPage">
 
     <Grid RowDefinitions="Auto,*" ColumnDefinitions="300,*,250">
-        <HorizontalStackLayout Spacing="10" Margin="10" Grid.ColumnSpan="3">
-            <Button Text="Load Component" Clicked="OnLoadComponentClicked"/>
-            <Button Text="Render Circuit" Clicked="OnRenderClicked"/>
-            <Button Text="Wire Mode" Clicked="OnWireModeClicked"/>
-            <Button Text="Save" Clicked="OnSaveClicked"/>
-            <Button Text="Reload" Clicked="OnReloadClicked"/>
-            <Button Text="Import" Clicked="OnImportClicked"/>
-            <Button Text="Export" Clicked="OnExportClicked"/>
-            <Button Text="Export Image" Clicked="OnExportImageClicked"/>
-        </HorizontalStackLayout>
+        <!-- Header & Toolbar -->
+        <Grid Grid.Row="0" Grid.ColumnSpan="3" ColumnDefinitions="Auto,*" BackgroundColor="#212121" Padding="10">
+            <HorizontalStackLayout Grid.Column="0" Spacing="10" VerticalOptions="Center" Margin="0,0,20,0">
+                <Image Source="circuitdiagramlogo.png" HeightRequest="32" WidthRequest="32" VerticalOptions="Center" Aspect="AspectFit"/>
+                <Label Text="Circuit Diagram" VerticalOptions="Center" FontAttributes="Bold" FontSize="18" TextColor="White"/>
+            </HorizontalStackLayout>
+
+            <ScrollView Grid.Column="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" VerticalScrollBarVisibility="Never">
+                <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                    <Button Text="📥 Load" Clicked="OnLoadComponentClicked" ToolTipProperties.Text="Load a component from XML" TextColor="White" BackgroundColor="Transparent"/>
+                    <Button Text="✏️ Wire" Clicked="OnWireModeClicked" ToolTipProperties.Text="Toggle wire drawing mode" TextColor="White" BackgroundColor="Transparent"/>
+                    <Button Text="💾 Save" Clicked="OnSaveClicked" ToolTipProperties.Text="Save current circuit" TextColor="White" BackgroundColor="Transparent"/>
+                    <Button Text="🔃 Reload" Clicked="OnReloadClicked" ToolTipProperties.Text="Reload from disk" TextColor="White" BackgroundColor="Transparent"/>
+                    <Button Text="📂 Import" Clicked="OnImportClicked" ToolTipProperties.Text="Import a circuit file" TextColor="White" BackgroundColor="Transparent"/>
+                    <Button Text="📤 Export" Clicked="OnExportClicked" ToolTipProperties.Text="Export to file" TextColor="White" BackgroundColor="Transparent"/>
+                    <Button Text="🖼️ Image" Clicked="OnExportImageClicked" ToolTipProperties.Text="Export as PNG image" TextColor="White" BackgroundColor="Transparent"/>
+                    <Button Text="🔄 Render" Clicked="OnRenderClicked" ToolTipProperties.Text="Force re-render" TextColor="White" BackgroundColor="Transparent"/>
+                </HorizontalStackLayout>
+            </ScrollView>
+        </Grid>
         
         <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*">
-            <SearchBar x:Name="searchBar" Placeholder="Search" TextChanged="OnSearchTextChanged"/>
+            <SearchBar x:Name="searchBar" Placeholder="Search components..." TextChanged="OnSearchTextChanged"/>
             <CollectionView x:Name="componentsList" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnComponentSelected">
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout Orientation="Vertical" Span="2" VerticalItemSpacing="10" HorizontalItemSpacing="10"/>
@@ -26,7 +36,7 @@
                     <DataTemplate>
                         <VerticalStackLayout Padding="5" BackgroundColor="White">
                             <Image Source="{Binding Preview}" HeightRequest="60" WidthRequest="60" Aspect="AspectFit"/>
-                            <Label Text="{Binding Name}" FontSize="10" HorizontalOptions="Center" HorizontalTextAlignment="Center" TextColor="Black" LineBreakMode="TailTruncation"/>
+                            <Label Text="{Binding Name}" FontSize="12" HorizontalOptions="Center" HorizontalTextAlignment="Center" TextColor="Black" LineBreakMode="TailTruncation"/>
                         </VerticalStackLayout>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>

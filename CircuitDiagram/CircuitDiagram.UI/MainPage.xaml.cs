@@ -200,7 +200,6 @@ public partial class MainPage : ContentPage
 
     private async void OnLoadComponentClicked(object sender, EventArgs e)
     {
-        Console.WriteLine("[DEBUG] OnLoadComponentClicked started");
         try
         {
             var result = await FilePicker.Default.PickAsync(new PickOptions
@@ -218,19 +217,14 @@ public partial class MainPage : ContentPage
 
             if (result != null)
             {
-                Console.WriteLine($"[DEBUG] File picked: {result.FullPath}");
                 using var stream = await result.OpenReadAsync();
-                Console.WriteLine("[DEBUG] Stream opened");
                 
                 var loader = new XmlLoader();
                 loader.UseDefinitions();
-                Console.WriteLine("[DEBUG] Loader configured");
                 
                 var logger = new StringListLogger();
-                Console.WriteLine("[DEBUG] Starting Load...");
                 if (loader.Load(stream, logger, out var description))
                 {
-                    Console.WriteLine($"[DEBUG] Load success: {description.ComponentName}");
                     var componentType = new TypeDescriptionComponentType(
                         description.Metadata.GUID, 
                         new Uri("http://circuit-diagram.org/components"), 
@@ -250,21 +244,14 @@ public partial class MainPage : ContentPage
                 }
                 else
                 {
-                    Console.WriteLine("[DEBUG] Load failed");
                     var errorMsg = string.Join("\n", logger.Errors);
-                    Console.WriteLine($"[DEBUG] Errors: {errorMsg}");
                     if (string.IsNullOrEmpty(errorMsg)) errorMsg = "Unknown error.";
                     await DisplayAlert("Error", $"Failed to load component description.\n{errorMsg}", "OK");
                 }
             }
-            else
-            {
-                Console.WriteLine("[DEBUG] File picking cancelled or result is null");
-            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DEBUG] Exception: {ex}");
             await DisplayAlert("Error", $"An error occurred: {ex.Message}", "OK");
         }
     }
@@ -284,8 +271,8 @@ public partial class MainPage : ContentPage
         }
         else
         {
-            button.ClearValue(Button.BackgroundColorProperty);
-            button.ClearValue(Button.TextColorProperty);
+            button.BackgroundColor = Colors.Transparent;
+            button.TextColor = Colors.White;
         }
         
         // Clear selection when entering wire mode

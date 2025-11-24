@@ -23,9 +23,11 @@ This is a .NET MAUI based GUI for Circuit Diagram.
 
 ## Usage
 
-- The application starts with a default circuit containing two wires.
-- Click "Load Component" to select a custom component XML file.
-- The component will be loaded and placed on the canvas.
+- The application starts with a default circuit.
+- Click "📥 Load" to select a custom component XML file.
+- Click "✏️ Wire" to toggle wire drawing mode.
+- Click "💾 Save" to save your work.
+- Use the layers panel on the right to manage components.
 
 ## Troubleshooting
 
