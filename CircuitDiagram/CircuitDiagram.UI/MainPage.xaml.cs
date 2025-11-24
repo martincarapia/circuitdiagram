@@ -329,6 +329,8 @@ public partial class MainPage : ContentPage
     private List<PositionalComponent> _selectedComponents = new List<PositionalComponent>();
     private CDPoint _dragStartLocation;
     private SKPoint _dragStartTouch;
+    private CDPoint _dragRelativeOffset;
+    private CircuitDiagram.Primitives.Size _dragBoundsSize;
 
     private List<LayerViewModel> _selectedLayers = new List<LayerViewModel>();
 
@@ -555,6 +557,23 @@ public partial class MainPage : ContentPage
 
                     _dragStartLocation = _draggingComponent.Layout.Location;
                     _dragStartTouch = e.Location;
+
+                    // Calculate relative offset for smart snapping
+                    try
+                    {
+                        var boundsContext = new BoundsDrawingContext();
+                        _renderer.RenderComponent(_draggingComponent, boundsContext, ignoreOffset: false);
+                        var bounds = boundsContext.Bounds;
+                        _dragRelativeOffset = new CDPoint(bounds.X - _draggingComponent.Layout.Location.X, 
+                                                          bounds.Y - _draggingComponent.Layout.Location.Y);
+                        _dragBoundsSize = bounds.Size;
+                    }
+                    catch
+                    {
+                        _dragRelativeOffset = new CDPoint(0, 0);
+                        _dragBoundsSize = new CircuitDiagram.Primitives.Size(0, 0);
+                    }
+
                     e.Handled = true;
                 }
                 else
@@ -570,12 +589,31 @@ public partial class MainPage : ContentPage
                     var dx = (e.Location.X - _dragStartTouch.X) / RenderScale;
                     var dy = (e.Location.Y - _dragStartTouch.Y) / RenderScale;
                     
-                    // Snap to grid (10 units logical = 20 units visual)
-                    var newX = _dragStartLocation.X + dx;
-                    var newY = _dragStartLocation.Y + dy;
+                    var rawX = _dragStartLocation.X + dx;
+                    var rawY = _dragStartLocation.Y + dy;
                     
-                    newX = Math.Round(newX / 10.0) * 10.0;
-                    newY = Math.Round(newY / 10.0) * 10.0;
+                    // Default Snap (10 units)
+                    double snapX = 10.0;
+                    double snapY = 10.0;
+                    double phaseX = 0.0;
+                    double phaseY = 0.0;
+
+                    // Smart Snap for Large Components (> 20 units)
+                    // If component is large, align its visual bounds to the grid
+                    if (_dragBoundsSize.Width > 20)
+                    {
+                        phaseX = -_dragRelativeOffset.X;
+                    }
+                    
+                    if (_dragBoundsSize.Height > 20)
+                    {
+                        phaseY = -_dragRelativeOffset.Y;
+                    }
+
+                    // Apply Snap
+                    // Formula: Round((Val - Phase) / Snap) * Snap + Phase
+                    var newX = Math.Round((rawX - phaseX) / snapX) * snapX + phaseX;
+                    var newY = Math.Round((rawY - phaseY) / snapY) * snapY + phaseY;
 
                     _draggingComponent.Layout.Location = new CDPoint(newX, newY);
                     canvasView.InvalidateSurface();
