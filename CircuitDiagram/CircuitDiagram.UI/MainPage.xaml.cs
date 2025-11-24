@@ -237,6 +237,24 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private bool _isWireMode = false;
+    private CDPoint? _wireStartPoint;
+    private CDPoint? _wireEndPoint;
+
+    private void OnWireModeClicked(object sender, EventArgs e)
+    {
+        _isWireMode = !_isWireMode;
+        ((Button)sender).BackgroundColor = _isWireMode ? Colors.LightBlue : Colors.Transparent;
+        
+        // Clear selection when entering wire mode
+        if (_isWireMode)
+        {
+            layersList.SelectedItems = null;
+            _selectedComponents.Clear();
+            canvasView.InvalidateSurface();
+        }
+    }
+
     private void OnRenderClicked(object sender, EventArgs e)
     {
         canvasView.InvalidateSurface();
@@ -288,6 +306,29 @@ public partial class MainPage : ContentPage
                             rect.Inflate(5, 5);
 
                             canvas.DrawRect(rect, paint);
+                        }
+                    }
+
+                    // Draw wire preview
+                    if (_isWireMode && _wireStartPoint.HasValue && _wireEndPoint.HasValue)
+                    {
+                        var paint = new SKPaint
+                        {
+                            Color = SKColors.Gray,
+                            Style = SKPaintStyle.Stroke,
+                            StrokeWidth = 2,
+                            PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0)
+                        };
+
+                        var wires = CalculateWireSegments(_wireStartPoint.Value, _wireEndPoint.Value);
+                        foreach (var wire in wires)
+                        {
+                            var start = wire.Layout.Location;
+                            var end = wire.Layout.Orientation == Orientation.Horizontal 
+                                ? new CDPoint(start.X + wire.Layout.Size, start.Y)
+                                : new CDPoint(start.X, start.Y + wire.Layout.Size);
+                            
+                            canvas.DrawLine((float)start.X, (float)start.Y, (float)end.X, (float)end.Y, paint);
                         }
                     }
                 }
@@ -538,53 +579,75 @@ public partial class MainPage : ContentPage
         switch (e.ActionType)
         {
             case SKTouchAction.Pressed:
-                // Hit test
-                _draggingComponent = _circuit.Elements
-                    .OfType<PositionalComponent>()
-                    .Reverse()
-                    .FirstOrDefault(c => IsHit(c, touchPoint));
-                
-                if (_draggingComponent != null)
+                if (_isWireMode)
                 {
-                    var layer = FindLayerForComponent(_draggingComponent);
-                    if (layer != null)
-                    {
-                        ExpandPathToLayer(layer);
-                        
-                        // Single select: replace selection
-                        layersList.SelectedItems = new ObservableCollection<object> { layer };
-                    }
-
-                    _dragStartLocation = _draggingComponent.Layout.Location;
-                    _dragStartTouch = e.Location;
-
-                    // Calculate relative offset for smart snapping
-                    try
-                    {
-                        var boundsContext = new BoundsDrawingContext();
-                        _renderer.RenderComponent(_draggingComponent, boundsContext, ignoreOffset: false);
-                        var bounds = boundsContext.Bounds;
-                        _dragRelativeOffset = new CDPoint(bounds.X - _draggingComponent.Layout.Location.X, 
-                                                          bounds.Y - _draggingComponent.Layout.Location.Y);
-                        _dragBoundsSize = bounds.Size;
-                    }
-                    catch
-                    {
-                        _dragRelativeOffset = new CDPoint(0, 0);
-                        _dragBoundsSize = new CircuitDiagram.Primitives.Size(0, 0);
-                    }
-
+                    // Snap start point to grid (10 units)
+                    double snapX = Math.Round(touchPoint.X / 10.0) * 10.0;
+                    double snapY = Math.Round(touchPoint.Y / 10.0) * 10.0;
+                    _wireStartPoint = new CDPoint(snapX, snapY);
+                    _wireEndPoint = _wireStartPoint;
                     e.Handled = true;
+                    canvasView.InvalidateSurface();
                 }
                 else
                 {
-                    layersList.SelectedItems = null; // Clear selection
+                    // Hit test
+                    _draggingComponent = _circuit.Elements
+                        .OfType<PositionalComponent>()
+                        .Reverse()
+                        .FirstOrDefault(c => IsHit(c, touchPoint));
+                    
+                    if (_draggingComponent != null)
+                    {
+                        var layer = FindLayerForComponent(_draggingComponent);
+                        if (layer != null)
+                        {
+                            ExpandPathToLayer(layer);
+                            
+                            // Single select: replace selection
+                            layersList.SelectedItems = new ObservableCollection<object> { layer };
+                        }
+
+                        _dragStartLocation = _draggingComponent.Layout.Location;
+                        _dragStartTouch = e.Location;
+
+                        // Calculate relative offset for smart snapping
+                        try
+                        {
+                            var boundsContext = new BoundsDrawingContext();
+                            _renderer.RenderComponent(_draggingComponent, boundsContext, ignoreOffset: false);
+                            var bounds = boundsContext.Bounds;
+                            _dragRelativeOffset = new CDPoint(bounds.X - _draggingComponent.Layout.Location.X, 
+                                                              bounds.Y - _draggingComponent.Layout.Location.Y);
+                            _dragBoundsSize = bounds.Size;
+                        }
+                        catch
+                        {
+                            _dragRelativeOffset = new CDPoint(0, 0);
+                            _dragBoundsSize = new CircuitDiagram.Primitives.Size(0, 0);
+                        }
+
+                        e.Handled = true;
+                    }
+                    else
+                    {
+                        layersList.SelectedItems = null; // Clear selection
+                    }
+                    canvasView.InvalidateSurface();
                 }
-                canvasView.InvalidateSurface();
                 break;
 
             case SKTouchAction.Moved:
-                if (_draggingComponent != null)
+                if (_isWireMode && _wireStartPoint.HasValue)
+                {
+                    // Snap end point to grid
+                    double snapX = Math.Round(touchPoint.X / 10.0) * 10.0;
+                    double snapY = Math.Round(touchPoint.Y / 10.0) * 10.0;
+                    _wireEndPoint = new CDPoint(snapX, snapY);
+                    e.Handled = true;
+                    canvasView.InvalidateSurface();
+                }
+                else if (_draggingComponent != null)
                 {
                     var dx = (e.Location.X - _dragStartTouch.X) / RenderScale;
                     var dy = (e.Location.Y - _dragStartTouch.Y) / RenderScale;
@@ -623,10 +686,89 @@ public partial class MainPage : ContentPage
 
             case SKTouchAction.Released:
             case SKTouchAction.Cancelled:
-                _draggingComponent = null;
-                e.Handled = true;
+                if (_isWireMode && _wireStartPoint.HasValue && _wireEndPoint.HasValue)
+                {
+                    // Create wire(s)
+                    CreateWires(_wireStartPoint.Value, _wireEndPoint.Value);
+                    _wireStartPoint = null;
+                    _wireEndPoint = null;
+                    e.Handled = true;
+                    canvasView.InvalidateSurface();
+                }
+                else
+                {
+                    _draggingComponent = null;
+                    e.Handled = true;
+                }
                 break;
         }
+    }
+
+    private void CreateWires(CDPoint start, CDPoint end)
+    {
+        if (start == end) return;
+
+        var wires = CalculateWireSegments(start, end);
+        foreach (var wire in wires)
+        {
+            _circuit.Elements.Add(wire);
+        }
+    }
+
+    private List<Wire> CalculateWireSegments(CDPoint start, CDPoint end)
+    {
+        var wires = new List<Wire>();
+        
+        // Simple L-shape routing
+        // Prefer horizontal first if deltaX > deltaY, else vertical first
+        double dx = Math.Abs(end.X - start.X);
+        double dy = Math.Abs(end.Y - start.Y);
+
+        if (dx > 0 && dy > 0)
+        {
+            // L-shape needed
+            if (dx > dy)
+            {
+                // Horizontal then Vertical
+                var mid = new CDPoint(end.X, start.Y);
+                wires.Add(CreateWireSegment(start, mid));
+                wires.Add(CreateWireSegment(mid, end));
+            }
+            else
+            {
+                // Vertical then Horizontal
+                var mid = new CDPoint(start.X, end.Y);
+                wires.Add(CreateWireSegment(start, mid));
+                wires.Add(CreateWireSegment(mid, end));
+            }
+        }
+        else
+        {
+            // Straight line
+            wires.Add(CreateWireSegment(start, end));
+        }
+
+        return wires;
+    }
+
+    private Wire CreateWireSegment(CDPoint p1, CDPoint p2)
+    {
+        var layout = new LayoutInformation();
+        
+        if (Math.Abs(p1.Y - p2.Y) < 0.1) // Horizontal
+        {
+            layout.Orientation = Orientation.Horizontal;
+            layout.Location = new CDPoint(Math.Min(p1.X, p2.X), p1.Y);
+            layout.Size = Math.Abs(p1.X - p2.X);
+        }
+        else // Vertical
+        {
+            layout.Orientation = Orientation.Vertical;
+            layout.Location = new CDPoint(p1.X, Math.Min(p1.Y, p2.Y));
+            layout.Size = Math.Abs(p1.Y - p2.Y);
+        }
+
+        return new Wire(layout);
     }
 
     private bool IsHit(PositionalComponent component, CDPoint point)
