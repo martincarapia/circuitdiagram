@@ -270,8 +270,24 @@ public partial class MainPage : ContentPage
                         };
                         foreach (var component in _selectedComponents)
                         {
-                            var loc = component.Layout.Location;
-                            canvas.DrawRect((float)loc.X - 25, (float)loc.Y - 25, 50, 50, paint);
+                            // Calculate bounds using BoundsDrawingContext
+                            var boundsContext = new BoundsDrawingContext();
+                            _renderer.RenderComponent(component, boundsContext, ignoreOffset: false);
+                            var bounds = boundsContext.Bounds;
+
+                            // Scale bounds by 2.0f as SkiaDrawingContext does
+                            // Update: The canvas is already scaled by 2.0f via SkiaDrawingContext constructor.
+                            // So we should NOT scale the coordinates again.
+                            var rect = new SKRect(
+                                (float)bounds.X, 
+                                (float)bounds.Y, 
+                                (float)bounds.BottomRight.X, 
+                                (float)bounds.BottomRight.Y);
+                            
+                            // Add some padding
+                            rect.Inflate(5, 5);
+
+                            canvas.DrawRect(rect, paint);
                         }
                     }
                 }

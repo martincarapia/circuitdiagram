@@ -190,7 +190,6 @@ namespace CircuitDiagram.Render.Skia
                 Style = SKPaintStyle.Fill,
                 TextSize = 12f * fontSizeScale,
                 Typeface = typeface,
-                SubpixelText = true,
                 IsLinearText = rotation != 0.0,
             };
 

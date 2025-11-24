@@ -140,8 +140,7 @@ namespace CircuitDiagram.UI
             {
                 Color = Color,
                 IsAntialias = true,
-                Style = SKPaintStyle.Fill,
-                SubpixelText = true
+                Style = SKPaintStyle.Fill
             };
 
             // 1. Measure total width and height
