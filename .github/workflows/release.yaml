@@ -10,12 +10,12 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
 
@@ -35,7 +35,7 @@ jobs:
       run: |
         Compress-Archive -Path ./publish/win-x64/* -DestinationPath ./CircuitDiagram-Windows.zip
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: CircuitDiagram-Windows
         path: CircuitDiagram-Windows.zip
@@ -43,12 +43,12 @@ jobs:
   build-mac:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
 
@@ -71,7 +71,7 @@ jobs:
         cd ./publish/mac
         zip -r ../../CircuitDiagram-Mac.zip CircuitDiagram.app
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: CircuitDiagram-Mac
         path: CircuitDiagram-Mac.zip
@@ -83,11 +83,11 @@ jobs:
     permissions:
       contents: write
     steps:
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: CircuitDiagram-Windows
     
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: CircuitDiagram-Mac
 
