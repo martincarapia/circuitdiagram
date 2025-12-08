@@ -1,4 +1,4 @@
-namespace CircuitDiagram.UI.Hybrid;
+namespace CircuitDiagram.UI.Native;
 
 public partial class App : Application
 {

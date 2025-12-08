@@ -1,9 +1,9 @@
-using CircuitDiagram.UI.Hybrid.Services;
+using CircuitDiagram.UI.Native.Services;
 using CircuitDiagram.UI.Shared.Services;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 
-namespace CircuitDiagram.UI.Hybrid;
+namespace CircuitDiagram.UI.Native;
 
 public static class MauiProgram
 {

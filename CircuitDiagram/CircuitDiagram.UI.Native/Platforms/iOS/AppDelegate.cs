@@ -1,6 +1,6 @@
 using Foundation;
 
-namespace CircuitDiagram.UI.Hybrid;
+namespace CircuitDiagram.UI.Native;
 
 [Register("AppDelegate")]
 public class AppDelegate : MauiUIApplicationDelegate

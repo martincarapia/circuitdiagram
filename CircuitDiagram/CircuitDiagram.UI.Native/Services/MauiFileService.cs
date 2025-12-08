@@ -1,7 +1,7 @@
 using CircuitDiagram.UI.Shared.Services;
 using FileResult = CircuitDiagram.UI.Shared.Services.FileResult;
 
-namespace CircuitDiagram.UI.Hybrid.Services;
+namespace CircuitDiagram.UI.Native.Services;
 
 /// <summary>
 /// MAUI implementation of IFileService using native file pickers.

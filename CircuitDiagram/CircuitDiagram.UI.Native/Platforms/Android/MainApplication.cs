@@ -1,7 +1,7 @@
 using Android.App;
 using Android.Runtime;
 
-namespace CircuitDiagram.UI.Hybrid;
+namespace CircuitDiagram.UI.Native;
 
 [Application]
 public class MainApplication : MauiApplication

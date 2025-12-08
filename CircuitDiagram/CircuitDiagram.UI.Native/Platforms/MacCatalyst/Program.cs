@@ -1,7 +1,7 @@
 using ObjCRuntime;
 using UIKit;
 
-namespace CircuitDiagram.UI.Hybrid;
+namespace CircuitDiagram.UI.Native;
 
 public class Program
 {

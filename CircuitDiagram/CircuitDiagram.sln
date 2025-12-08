@@ -46,7 +46,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CircuitDiagram.Web", "Circu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CircuitDiagram.UI.Shared", "CircuitDiagram.UI.Shared\CircuitDiagram.UI.Shared.csproj", "{F3D873FB-9759-48B5-884E-CB8FCC2F3D59}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CircuitDiagram.UI.Hybrid", "CircuitDiagram.UI.Hybrid\CircuitDiagram.UI.Hybrid.csproj", "{7E2A47BC-3B87-4275-91AE-C2CA23E57A92}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CircuitDiagram.UI.Native", "CircuitDiagram.UI.Native\CircuitDiagram.UI.Native.csproj", "{7E2A47BC-3B87-4275-91AE-C2CA23E57A92}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CircuitDiagram.UI.Browser", "CircuitDiagram.UI.Browser\CircuitDiagram.UI.Browser.csproj", "{52407C35-D942-47A3-BF6D-6CC935C3A80A}"
 EndProject

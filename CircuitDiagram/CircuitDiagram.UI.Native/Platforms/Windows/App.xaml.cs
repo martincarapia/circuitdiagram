@@ -1,6 +1,6 @@
 using Microsoft.UI.Xaml;
 
-namespace CircuitDiagram.UI.Hybrid.WinUI;
+namespace CircuitDiagram.UI.Native.WinUI;
 
 /// <summary>
 /// Provides application-specific behavior to supplement the default Application class.

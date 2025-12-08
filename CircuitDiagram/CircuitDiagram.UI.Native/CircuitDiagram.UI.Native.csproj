@@ -5,7 +5,7 @@
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
     
     <OutputType>Exe</OutputType>
-    <RootNamespace>CircuitDiagram.UI.Hybrid</RootNamespace>
+    <RootNamespace>CircuitDiagram.UI.Native</RootNamespace>
     <UseMaui>true</UseMaui>
     <SingleProject>true</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -16,7 +16,7 @@
     <ApplicationTitle>Circuit Diagram</ApplicationTitle>
 
     <!-- App Identifier -->
-    <ApplicationId>com.circuitdiagram.hybrid</ApplicationId>
+    <ApplicationId>com.circuitdiagram.native</ApplicationId>
 
     <!-- Versions -->
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
