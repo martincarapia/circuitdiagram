@@ -24,3 +24,8 @@ Setup/Output/
 *.nupkg
 *.DotSettings.user
 launchSettings.json
+
+CircuitDiagram-Mac.zip
+CircuitDiagram.UI.app/  
+release_output/
+.DS_Store
