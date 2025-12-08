@@ -1,0 +1,76 @@
+<div class="toolbar">
+    <div class="toolbar-group toolbar-title">
+        <span class="app-icon">⚡</span>
+        <span class="app-name">Circuit Diagram</span>
+    </div>
+    
+    <div class="toolbar-group toolbar-actions">
+        <button class="btn @(IsWireMode ? "btn-active" : "btn-secondary")" 
+                @onclick="ToggleWireMode"
+                title="Wire Mode (W)"
+                aria-label="Toggle wire drawing mode"
+                aria-pressed="@IsWireMode">
+            ✏️ Wire
+        </button>
+        
+        <button class="btn btn-secondary" 
+                @onclick="OnClear"
+                title="Clear Circuit"
+                aria-label="Clear all elements">
+            🗑️ Clear
+        </button>
+        
+        <button class="btn btn-secondary" 
+                @onclick="OnSave"
+                title="Save Circuit"
+                aria-label="Save circuit to file">
+            💾 Save
+        </button>
+    </div>
+    
+    @if (SelectedComponentType != null)
+    {
+        <div class="toolbar-group toolbar-status">
+            <span class="status-text">Placing: @SelectedComponentType.ComponentName</span>
+            <button class="btn btn-sm btn-secondary" @onclick="CancelPlacement" aria-label="Cancel placement">
+                ✕
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public bool IsWireMode { get; set; }
+    [Parameter] public EventCallback<bool> IsWireModeChanged { get; set; }
+    [Parameter] public ComponentDescription? SelectedComponentType { get; set; }
+    [Parameter] public EventCallback<ComponentDescription?> SelectedComponentTypeChanged { get; set; }
+    [Parameter] public EventCallback OnClearRequested { get; set; }
+    [Parameter] public EventCallback OnSaveRequested { get; set; }
+
+    private async Task ToggleWireMode()
+    {
+        IsWireMode = !IsWireMode;
+        await IsWireModeChanged.InvokeAsync(IsWireMode);
+        
+        // Clear component selection when entering wire mode
+        if (IsWireMode)
+        {
+            await SelectedComponentTypeChanged.InvokeAsync(null);
+        }
+    }
+
+    private async Task CancelPlacement()
+    {
+        await SelectedComponentTypeChanged.InvokeAsync(null);
+    }
+
+    private async Task OnClear()
+    {
+        await OnClearRequested.InvokeAsync();
+    }
+
+    private async Task OnSave()
+    {
+        await OnSaveRequested.InvokeAsync();
+    }
+}

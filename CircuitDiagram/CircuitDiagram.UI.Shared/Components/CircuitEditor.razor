@@ -1,0 +1,76 @@
+@inject CircuitEditorService EditorService
+@inject IFileService FileService
+
+<div class="circuit-editor">
+    <Toolbar @bind-IsWireMode="_isWireMode"
+             @bind-SelectedComponentType="_selectedComponent"
+             OnClearRequested="OnClear"
+             OnSaveRequested="OnSave" />
+    
+    <div class="editor-content">
+        <ComponentPanel @bind-SelectedComponent="_selectedComponent"
+                        OnStatusMessage="OnStatusMessage" />
+        
+        <div class="canvas-area">
+            <div class="canvas-wrapper">
+                <CircuitCanvas Width="800" 
+                               Height="600"
+                               IsWireMode="_isWireMode"
+                               SelectedComponentType="_selectedComponent" />
+            </div>
+        </div>
+        
+        <LayersPanel />
+    </div>
+    
+    @if (!string.IsNullOrEmpty(_statusMessage))
+    {
+        <div class="status-toast @(_isError ? "error" : "success")" role="alert">
+            @_statusMessage
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isWireMode;
+    private ComponentDescription? _selectedComponent;
+    private string? _statusMessage;
+    private bool _isError;
+    private CancellationTokenSource? _statusCts;
+
+    private void OnClear()
+    {
+        EditorService.ClearCircuit();
+        ShowStatus("Circuit cleared");
+    }
+
+    private Task OnSave()
+    {
+        // TODO: Implement save using IFileService
+        ShowStatus("Save not yet implemented");
+        return Task.CompletedTask;
+    }
+
+    private void OnStatusMessage(string message)
+    {
+        ShowStatus(message);
+    }
+
+    private async void ShowStatus(string message, bool isError = false)
+    {
+        _statusCts?.Cancel();
+        _statusCts = new CancellationTokenSource();
+        
+        _statusMessage = message;
+        _isError = isError;
+        StateHasChanged();
+        
+        try
+        {
+            await Task.Delay(3000, _statusCts.Token);
+            _statusMessage = null;
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+}

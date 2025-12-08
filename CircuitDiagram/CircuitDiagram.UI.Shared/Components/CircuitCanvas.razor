@@ -1,0 +1,185 @@
+@inject CircuitEditorService EditorService
+@implements IDisposable
+
+<div class="circuit-canvas-container" @ref="containerRef">
+    <SKCanvasView @ref="canvasView"
+                  OnPaintSurface="OnPaintSurface"
+                  @onpointerdown="OnPointerDown"
+                  @onpointermove="OnPointerMove"
+                  @onpointerup="OnPointerUp"
+                  style="@GetCanvasStyle()" />
+</div>
+
+@if (IsWireMode && _wireStartPoint.HasValue)
+{
+    <div class="wire-mode-indicator">Drawing wire...</div>
+}
+
+@code {
+    private SKCanvasView? canvasView;
+    private ElementReference containerRef;
+    
+    [Parameter] public int Width { get; set; } = 800;
+    [Parameter] public int Height { get; set; } = 600;
+    [Parameter] public bool IsWireMode { get; set; }
+    [Parameter] public ComponentDescription? SelectedComponentType { get; set; }
+    [Parameter] public EventCallback OnCanvasUpdated { get; set; }
+    
+    // Interaction state
+    private bool _isDragging;
+    private PositionalComponent? _draggingComponent;
+    private CircuitDiagram.Primitives.Point _dragStartLocation;
+    private CircuitDiagram.Primitives.Point _lastPointerPosition;
+    
+    // Wire drawing state
+    private CircuitDiagram.Primitives.Point? _wireStartPoint;
+    private CircuitDiagram.Primitives.Point? _wireEndPoint;
+    
+    protected override void OnInitialized()
+    {
+        EditorService.OnCircuitChanged += Refresh;
+        EditorService.OnSelectionChanged += Refresh;
+    }
+
+    private void Refresh()
+    {
+        canvasView?.Invalidate();
+        StateHasChanged();
+    }
+
+    private void OnPaintSurface(SKPaintSurfaceEventArgs e)
+    {
+        EditorService.RenderToCanvas(e.Surface.Canvas, e.Info.Width, e.Info.Height);
+        
+        // Draw wire preview if in wire mode
+        if (IsWireMode && _wireStartPoint.HasValue && _wireEndPoint.HasValue)
+        {
+            DrawWirePreview(e.Surface.Canvas);
+        }
+    }
+
+    private void DrawWirePreview(SKCanvas canvas)
+    {
+        if (!_wireStartPoint.HasValue || !_wireEndPoint.HasValue) return;
+        
+        using var paint = new SKPaint
+        {
+            Color = SKColors.Gray,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 2,
+            PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0)
+        };
+
+        var start = _wireStartPoint.Value;
+        var end = _wireEndPoint.Value;
+        
+        // Draw orthogonal preview (horizontal then vertical)
+        canvas.DrawLine((float)start.X, (float)start.Y, (float)end.X, (float)start.Y, paint);
+        canvas.DrawLine((float)end.X, (float)start.Y, (float)end.X, (float)end.Y, paint);
+    }
+
+    private void OnPointerDown(PointerEventArgs e)
+    {
+        var point = new CircuitDiagram.Primitives.Point(e.OffsetX, e.OffsetY);
+        _lastPointerPosition = point;
+        
+        if (IsWireMode)
+        {
+            _wireStartPoint = point;
+            _wireEndPoint = point;
+        }
+        else if (SelectedComponentType != null)
+        {
+            // Add new component at click location
+            var circuitPoint = new CircuitDiagram.Primitives.Point(
+                e.OffsetX / EditorService.RenderScale,
+                e.OffsetY / EditorService.RenderScale);
+            EditorService.AddComponent(SelectedComponentType, circuitPoint.X, circuitPoint.Y);
+        }
+        else
+        {
+            // Try to select/drag existing component
+            var hitComponent = EditorService.HitTest(point);
+            if (hitComponent != null)
+            {
+                bool addToSelection = e.ShiftKey;
+                EditorService.SelectComponent(hitComponent, addToSelection);
+                _isDragging = true;
+                _draggingComponent = hitComponent;
+                _dragStartLocation = hitComponent.Layout.Location;
+            }
+            else
+            {
+                EditorService.ClearSelection();
+            }
+        }
+        
+        canvasView?.Invalidate();
+    }
+
+    private void OnPointerMove(PointerEventArgs e)
+    {
+        var point = new CircuitDiagram.Primitives.Point(e.OffsetX, e.OffsetY);
+        
+        if (IsWireMode && _wireStartPoint.HasValue)
+        {
+            _wireEndPoint = point;
+            canvasView?.Invalidate();
+        }
+        else if (_isDragging && _draggingComponent != null)
+        {
+            var delta = new CircuitDiagram.Primitives.Point(
+                (point.X - _lastPointerPosition.X) / EditorService.RenderScale,
+                (point.Y - _lastPointerPosition.Y) / EditorService.RenderScale);
+            
+            var newLocation = new CircuitDiagram.Primitives.Point(
+                _draggingComponent.Layout.Location.X + delta.X,
+                _draggingComponent.Layout.Location.Y + delta.Y);
+            
+            EditorService.MoveComponent(_draggingComponent, newLocation);
+            _lastPointerPosition = point;
+        }
+    }
+
+    private void OnPointerUp(PointerEventArgs e)
+    {
+        if (IsWireMode && _wireStartPoint.HasValue)
+        {
+            var endPoint = new CircuitDiagram.Primitives.Point(e.OffsetX, e.OffsetY);
+            
+            // Only add wire if there's meaningful distance
+            var dx = Math.Abs(endPoint.X - _wireStartPoint.Value.X);
+            var dy = Math.Abs(endPoint.Y - _wireStartPoint.Value.Y);
+            if (dx > 10 || dy > 10)
+            {
+                EditorService.AddWire(_wireStartPoint.Value, endPoint);
+            }
+            
+            _wireStartPoint = null;
+            _wireEndPoint = null;
+        }
+        
+        _isDragging = false;
+        _draggingComponent = null;
+        canvasView?.Invalidate();
+    }
+
+    private string GetCursor()
+    {
+        if (IsWireMode) return "crosshair";
+        if (SelectedComponentType != null) return "copy";
+        if (_isDragging) return "grabbing";
+        return "default";
+    }
+
+    private string GetCanvasStyle()
+    {
+        return $"width: 100%; height: 100%; cursor: {GetCursor()};";
+    }
+
+    public void Dispose()
+    {
+        EditorService.OnCircuitChanged -= Refresh;
+        EditorService.OnSelectionChanged -= Refresh;
+    }
+}

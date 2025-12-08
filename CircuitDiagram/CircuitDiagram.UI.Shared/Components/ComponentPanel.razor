@@ -1,0 +1,142 @@
+@inject CircuitEditorService EditorService
+@inject IFileService FileService
+@implements IDisposable
+
+<div class="component-panel">
+    <div class="panel-header">
+        <h3>Components</h3>
+        <div class="panel-actions">
+            <label class="btn btn-sm btn-primary" aria-label="Load component XML file">
+                📥 Load
+                <InputFile OnChange="OnFileSelected" accept=".xml" style="display: none;" />
+            </label>
+        </div>
+    </div>
+    
+    <div class="component-list" role="listbox" aria-label="Available components">
+        @if (!EditorService.LoadedComponents.Any())
+        {
+            <div class="empty-state">
+                <p>No components loaded.</p>
+                <p>Click "Load" to add component XML files.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var group in EditorService.LoadedComponents.GroupBy(c => GetCategory(c)))
+            {
+                <div class="component-category">
+                    <div class="category-header" @onclick="() => ToggleCategory(group.Key)">
+                        <span class="category-icon">@(IsExpanded(group.Key) ? "▼" : "▶")</span>
+                        <span class="category-name">@group.Key</span>
+                        <span class="category-count">(@group.Count())</span>
+                    </div>
+                    @if (IsExpanded(group.Key))
+                    {
+                        <div class="category-items">
+                            @foreach (var component in group)
+                            {
+                                <div class="component-item @(SelectedComponent == component ? "selected" : "")"
+                                     role="option"
+                                     aria-selected="@(SelectedComponent == component)"
+                                     @onclick="() => SelectComponent(component)"
+                                     @ondblclick="() => AddComponent(component)"
+                                     tabindex="0"
+                                     @onkeydown="e => OnKeyDown(e, component)">
+                                    <span class="component-icon">🔲</span>
+                                    <span class="component-name">@component.ComponentName</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public ComponentDescription? SelectedComponent { get; set; }
+    [Parameter] public EventCallback<ComponentDescription?> SelectedComponentChanged { get; set; }
+    [Parameter] public EventCallback<string> OnStatusMessage { get; set; }
+    
+    private HashSet<string> _expandedCategories = new() { "common", "output", "misc" };
+    
+    protected override void OnInitialized()
+    {
+        EditorService.OnComponentsLoaded += StateHasChanged;
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(20))
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 1024 * 1024);
+                using var memoryStream = new MemoryStream();
+                await stream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+
+                var result = EditorService.LoadComponent(memoryStream);
+                if (result.IsSuccess)
+                {
+                    await OnStatusMessage.InvokeAsync($"Loaded: {result.Description?.ComponentName}");
+                }
+                else
+                {
+                    await OnStatusMessage.InvokeAsync($"Error loading {file.Name}: {result.Error}");
+                }
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await OnStatusMessage.InvokeAsync($"Error: {ex.Message}");
+        }
+    }
+
+    private void SelectComponent(ComponentDescription component)
+    {
+        var newSelection = SelectedComponent == component ? null : component;
+        SelectedComponent = newSelection;
+        SelectedComponentChanged.InvokeAsync(newSelection);
+    }
+
+    private void AddComponent(ComponentDescription component)
+    {
+        // Add to center of canvas (400, 300 in circuit coords at scale 2)
+        EditorService.AddComponent(component, 200, 150);
+        OnStatusMessage.InvokeAsync($"Added: {component.ComponentName}");
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e, ComponentDescription component)
+    {
+        if (e.Key == "Enter" || e.Key == " ")
+        {
+            SelectComponent(component);
+        }
+    }
+
+    private string GetCategory(ComponentDescription component)
+    {
+        // Could be enhanced to read from component metadata
+        return "Components";
+    }
+
+    private bool IsExpanded(string category) => _expandedCategories.Contains(category.ToLower());
+
+    private void ToggleCategory(string category)
+    {
+        var key = category.ToLower();
+        if (_expandedCategories.Contains(key))
+            _expandedCategories.Remove(key);
+        else
+            _expandedCategories.Add(key);
+    }
+
+    public void Dispose()
+    {
+        EditorService.OnComponentsLoaded -= StateHasChanged;
+    }
+}

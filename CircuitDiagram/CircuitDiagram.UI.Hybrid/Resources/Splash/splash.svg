@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect x="40" y="70" width="120" height="60" fill="none" stroke="white" stroke-width="6"/>
+  <line x1="0" y1="100" x2="40" y2="100" stroke="white" stroke-width="6"/>
+  <line x1="160" y1="100" x2="200" y2="100" stroke="white" stroke-width="6"/>
+  <text x="100" y="110" text-anchor="middle" font-family="Arial" font-size="24" fill="white" font-weight="bold">CIRCUIT</text>
+</svg>

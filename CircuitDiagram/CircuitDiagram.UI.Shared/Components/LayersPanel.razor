@@ -1,0 +1,89 @@
+@inject CircuitEditorService EditorService
+@implements IDisposable
+
+<div class="layers-panel">
+    <div class="panel-header">
+        <h3>Layers</h3>
+        <div class="panel-actions">
+            @if (EditorService.SelectedComponents.Any())
+            {
+                <button class="btn btn-sm btn-danger" @onclick="DeleteSelected" aria-label="Delete selected">
+                    🗑️
+                </button>
+            }
+        </div>
+    </div>
+    
+    <div class="layer-list" role="listbox" aria-label="Circuit elements">
+        @if (!EditorService.GetElements().Any())
+        {
+            <div class="empty-state">
+                <p>No elements on canvas.</p>
+                <p>Add components or draw wires.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var element in EditorService.GetElements().Reverse())
+            {
+                <div class="layer-item @(IsSelected(element) ? "selected" : "")"
+                     role="option"
+                     aria-selected="@IsSelected(element)"
+                     @onclick="() => OnLayerClick(element)"
+                     tabindex="0">
+                    @if (element is PositionalComponent pc)
+                    {
+                        <span class="layer-icon">🔲</span>
+                        <span class="layer-name">@pc.Type.CollectionItem</span>
+                    }
+                    else if (element is Wire)
+                    {
+                        <span class="layer-icon">〰️</span>
+                        <span class="layer-name">Wire</span>
+                    }
+                    else
+                    {
+                        <span class="layer-icon">❓</span>
+                        <span class="layer-name">Unknown</span>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        EditorService.OnCircuitChanged += StateHasChanged;
+        EditorService.OnSelectionChanged += StateHasChanged;
+    }
+
+    private bool IsSelected(IElement element)
+    {
+        return element is PositionalComponent pc && EditorService.SelectedComponents.Contains(pc);
+    }
+
+    private void OnLayerClick(IElement element)
+    {
+        if (element is PositionalComponent pc)
+        {
+            EditorService.SelectComponent(pc);
+        }
+    }
+
+    private void DeleteSelected()
+    {
+        var toDelete = EditorService.SelectedComponents.ToList();
+        foreach (var component in toDelete)
+        {
+            EditorService.RemoveComponent(component);
+        }
+    }
+
+    public void Dispose()
+    {
+        EditorService.OnCircuitChanged -= StateHasChanged;
+        EditorService.OnSelectionChanged -= StateHasChanged;
+    }
+}
